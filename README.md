@@ -1,170 +1,152 @@
-# Claude Code Leaderboard CLI
+# Claude Stats - 团队使用统计系统
 
-Track your Claude Code usage and compete on the global leaderboard! This CLI automatically monitors your token usage and posts your stats to the leaderboard after each Claude Code session.
+简单、无认证的 Claude Code 使用统计系统，适合团队内部使用。
 
-## Quick Start
+## 🎯 特性
 
-```bash
-npx claude-code-leaderboard
+- 📊 自动跟踪 Claude Code 使用数据
+- 🚀 无需登录认证，通过用户名识别
+- 📈 美观的 Web Dashboard 实时展示
+- 💾 SQLite 数据库，易于部署
+- 🔧 一键安装配置
+
+## 📁 项目结构
+
+```
+claude-stats/
+├── server/          # 服务端 - 部署到 Render
+│   ├── index.js     # Express 服务器
+│   ├── db/          # SQLite 数据库
+│   ├── routes/      # API 路由
+│   └── public/      # Dashboard 前端
+│
+└── client/          # 客户端 - CLI 工具
+    ├── bin/         # CLI 入口
+    ├── src/         # 命令实现
+    └── hooks/       # Claude Hook 脚本
 ```
 
-Follow the setup prompts to authenticate with Twitter and start tracking your usage automatically.
+## 🚀 快速开始
 
-## How It Works
+### 1. 部署服务端
 
-The CLI integrates with Claude Code's hook system to automatically track your usage:
-
-1. **Automatic Setup**: Installs a tracking hook in your Claude Code configuration
-2. **Usage Monitoring**: After each Claude Code session ends (STOP command), your token usage is collected
-3. **Data Submission**: Usage data is automatically sent to our backend service 
-4. **Leaderboard Updates**: Your stats appear on the public leaderboard at [claudecount.com](https://claudecount.com)
-
-### What Gets Tracked
-
-- Input tokens used
-- Output tokens generated  
-- Cache creation/read tokens
-- Session timestamps
-- Model used (e.g., claude-sonnet-4)
-
-Your actual prompts and responses are never collected - only usage statistics.
-
-## Understanding Claude Code Hooks
-
-### What Are Hooks?
-Claude Code hooks are user-defined shell commands that execute automatically at specific points during Claude Code's execution lifecycle. They allow you to inject deterministic, programmatic actions directly into the agent's workflow - ensuring that key tasks always occur exactly when intended, rather than relying on the AI to remember to do them.
-
-### Hook Types
-Claude Code supports hooks at different lifecycle events:
-- **Start**: When a Claude Code session begins
-- **Stop**: When a Claude Code session ends  
-- **PreTool**: Before any tool or command is executed
-- **PostTool**: After a tool or command completes
-
-### How This Project Uses Hooks
-This leaderboard CLI specifically uses a **Stop** hook, which means:
-- Every time you finish a Claude Code session (when Claude Code exits)
-- The hook automatically executes with your user permissions
-- No confirmation is required - it runs silently in the background
-- The hook scans your Claude Code usage data and sends statistics to our backend
-
-This provides reliable, automatic tracking without you having to remember to manually submit your usage.
-
-## File Installation Details
-
-When you run the setup, the following files are created on your system:
-
-### Hook Script
-- **Location**: `~/.claude/count_tokens.js`
-- **Purpose**: The actual script that collects and sends your usage data
-- **Permissions**: Executes with your user permissions
-- **When it runs**: Automatically after each Claude Code session ends
-
-### Configuration Files
-- **`~/.claude/settings.json`**: Updated to register the Stop hook
-- **`~/.claude/leaderboard.json`**: Stores your Twitter authentication and API settings
-
-### What the Hook Does
-The `count_tokens.js` script:
-1. Scans Claude Code project directories for usage log files (`.jsonl` files)
-2. Extracts token usage statistics from the most recent session
-3. Sends only the statistics (not your prompts/responses) to our backend
-4. Updates your position on the leaderboard
-
-## Commands
-
+#### 本地运行
 ```bash
-# Setup or re-authenticate
-npx claude-code-leaderboard
-
-# Reset/uninstall (with optional account deletion)
-npx claude-code-leaderboard reset
-
-# View help
-npx claude-code-leaderboard --help
-```
-
-## Features
-
-- **One-command setup**: Complete setup with a single command
-- **Automatic tracking**: Seamless integration with Claude Code hooks
-- **Twitter authentication**: Secure OAuth 1.0a authentication
-- **Privacy-focused**: Only usage statistics are collected
-- **Cross-platform**: Works on macOS, Linux, and Windows
-- **View stats online**: Visit [claudecount.com](https://claudecount.com) to see your stats and the leaderboard
-
-## Requirements
-
-- Node.js 16.0.0 or higher
-- Claude Code CLI installed and configured
-- Twitter account for authentication
-
-## Configuration
-
-The CLI automatically manages your configuration in `~/.claude/leaderboard.json` including:
-- Twitter authentication tokens
-- API endpoint settings
-- User preferences
-
-## Privacy & Security
-
-### What Data Is Collected
-- **Usage statistics only**: Token counts, timestamps, model names
-- **No content**: Your actual prompts and Claude's responses are never transmitted
-- **Linked to Twitter**: All data is associated with your Twitter handle for leaderboard display
-
-### Security Considerations
-- **User permissions**: The hook runs with your full user permissions
-- **Automatic execution**: No confirmation required when the hook runs
-- **Trusted source**: Only install hooks from sources you trust
-- **OAuth authentication**: Uses secure OAuth 1.0a for Twitter authentication
-
-### What You Should Know
-- Hooks execute automatically after each Claude Code session
-- The script only reads Claude Code's own usage log files
-- You can uninstall at any time by running the reset command
-- All source code is available for inspection in this repository
-
-## Uninstalling
-
-### Complete Removal
-The `reset` command provides a comprehensive uninstall process:
-
-```bash
-npx claude-code-leaderboard reset
-```
-
-This command will:
-1. Remove all local CLAUDE COUNT files and settings
-2. Unregister the hook from Claude Code
-3. **Optionally**: Delete your account from the leaderboard database
-
-### Account Deletion
-If you're authenticated, the reset command will offer to permanently delete your account from the leaderboard. This includes:
-- Your user account and all authentication data
-- Complete token usage history
-- Your position on the leaderboard
-
-⚠️ **Warning**: Account deletion is permanent and cannot be undone. You'll need to type your Twitter handle to confirm this action.
-
-## Development
-
-```bash
-# Install dependencies
+cd server
 npm install
-
-# Test the CLI locally
-node bin/cli.js --help
+npm start
+# 访问 http://localhost:3000
 ```
 
-## Support
+#### 部署到 Render
+1. Fork 或 Clone 此仓库
+2. 将 `server` 目录推送到 GitHub
+3. 在 [Render](https://render.com) 创建 Web Service
+4. 添加 Disk：
+   - Mount Path: `/data`
+   - Size: 1GB
+5. 设置环境变量：
+   ```
+   NODE_ENV=production
+   DB_PATH=/data/stats.db
+   ```
 
-For issues or questions:
-- Check that Claude Code is properly installed
-- Verify your Twitter authentication
-- Ensure Node.js 16+ is installed
-- Check network connectivity
+### 2. 安装客户端
 
-## Contributing
+```bash
+cd client
+npm install -g .
 
-This is an open source project! Contributions are welcome.
+# 或直接使用 npx
+npx claude-stats init
+```
+
+### 3. 配置客户端
+
+```bash
+claude-stats init
+
+# 输入配置信息
+> 用户名: john_doe
+> 服务器: https://your-app.onrender.com
+> 启用跟踪: Yes
+```
+
+## 📊 使用方法
+
+### CLI 命令
+
+```bash
+# 查看个人统计
+claude-stats stats
+
+# 打开 Dashboard
+claude-stats dashboard
+
+# 启用/禁用跟踪
+claude-stats toggle
+
+# 查看配置
+claude-stats config --show
+
+# 重置配置
+claude-stats reset
+```
+
+### Web Dashboard
+
+访问服务器地址即可查看：
+- 实时统计数据
+- 用户排行榜
+- 使用趋势图表
+- 最近活动记录
+
+## 🔧 API 接口
+
+### 提交数据
+```http
+POST /api/usage/submit
+Content-Type: application/json
+
+{
+  "username": "john_doe",
+  "usage": {
+    "timestamp": "2024-01-01T12:00:00Z",
+    "tokens": {
+      "input": 1000,
+      "output": 500
+    },
+    "model": "claude-3-opus"
+  }
+}
+```
+
+### 获取统计
+```http
+GET /api/stats/overview?period=7d
+GET /api/stats/user/:username
+GET /api/stats/rankings
+GET /api/stats/trends
+```
+
+## 🏗 技术栈
+
+- **服务端**: Node.js + Express + SQLite
+- **客户端**: Node.js CLI
+- **前端**: HTML + CSS + Chart.js
+- **部署**: Render + Persistent Disk
+
+## 📝 设计理念
+
+- **无认证**: 适合内部团队使用，通过用户名识别
+- **简单部署**: SQLite 数据库，无需外部依赖
+- **自动跟踪**: Hook 集成，无需手动操作
+- **实时展示**: Dashboard 自动刷新，查看即时数据
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+## 📄 License
+
+MIT
