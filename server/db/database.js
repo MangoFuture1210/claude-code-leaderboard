@@ -19,11 +19,15 @@ export class Database {
       const dir = path.dirname(this.dbPath);
       await fs.mkdir(dir, { recursive: true });
 
+      console.log('Attempting to open database at:', this.dbPath);
+
       // 打开数据库连接
       this.db = await open({
         filename: this.dbPath,
         driver: sqlite3.Database
       });
+
+      console.log('Database opened successfully');
 
       // 启用 WAL 模式以提升并发性能
       await this.db.exec('PRAGMA journal_mode = WAL');
@@ -32,6 +36,11 @@ export class Database {
 
       // 初始化表结构
       await this.initTables();
+      
+      // 检查数据库中是否有数据
+      const userCount = await this.db.get('SELECT COUNT(*) as count FROM users');
+      const recordCount = await this.db.get('SELECT COUNT(*) as count FROM usage_records');
+      console.log('Database status - Users:', userCount?.count || 0, 'Records:', recordCount?.count || 0);
       
       console.log('Database initialized at:', this.dbPath);
       return true;

@@ -79,15 +79,21 @@ async function loadPrices() {
     return cachedPrices;
   }
   
-  // 尝试加载文件缓存
-  const cached = await loadCachedPricing();
-  if (cached && cached.prices) {
-    cachedPrices = cached.prices;
-    lastLoadTime = now;
-    return cached.prices;
+  try {
+    // 尝试加载文件缓存
+    const cached = await loadCachedPricing();
+    if (cached && cached.prices) {
+      cachedPrices = cached.prices;
+      lastLoadTime = now;
+      return cached.prices;
+    }
+  } catch (error) {
+    console.log('Could not load cached pricing, using defaults:', error.message);
   }
   
   // 使用默认价格
+  cachedPrices = DEFAULT_PRICES;
+  lastLoadTime = now;
   return DEFAULT_PRICES;
 }
 

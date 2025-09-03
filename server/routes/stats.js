@@ -9,10 +9,17 @@ router.get('/overview', async (req, res) => {
   try {
     const { period = '7d' } = req.query;
     
+    console.log('Getting overview stats for period:', period);
+    
     // 获取统计数据
     const stats = await db.getStats(period);
+    console.log('Stats result:', stats);
+    
     const rankings = await db.getUserRankings(10);
+    console.log('Rankings count:', rankings?.length || 0);
+    
     const recent = await db.getRecentRecords(20);
+    console.log('Recent records count:', recent?.length || 0);
 
     // 计算排行榜中每个用户的成本（添加错误处理）
     const rankingsWithCost = await Promise.all(rankings.map(async user => {
@@ -162,6 +169,36 @@ router.get('/activity', async (req, res) => {
     console.error('Activity error:', error);
     res.status(500).json({ 
       error: 'Failed to get activity'
+    });
+  }
+});
+
+// 调试端点 - 检查数据库状态
+router.get('/debug', async (req, res) => {
+  try {
+    // 直接执行简单查询
+    const tables = await db.db.all(`
+      SELECT name FROM sqlite_master 
+      WHERE type='table' 
+      ORDER BY name
+    `);
+    
+    const userCount = await db.db.get('SELECT COUNT(*) as count FROM users');
+    const recordCount = await db.db.get('SELECT COUNT(*) as count FROM usage_records');
+    const viewTest = await db.db.all('SELECT * FROM user_rankings LIMIT 3');
+    
+    res.json({
+      database_path: process.env.DB_PATH || 'local',
+      tables: tables.map(t => t.name),
+      user_count: userCount?.count || 0,
+      record_count: recordCount?.count || 0,
+      view_working: viewTest.length > 0,
+      sample_data: viewTest
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message,
+      stack: error.stack
     });
   }
 });

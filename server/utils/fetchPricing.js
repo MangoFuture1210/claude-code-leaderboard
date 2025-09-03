@@ -216,8 +216,10 @@ export async function updatePricing() {
  * 初始化定时更新
  */
 export function initPricingUpdater() {
-  // 启动时立即更新一次
-  updatePricing().catch(console.error);
+  // 启动时异步更新（不阻塞）
+  setTimeout(() => {
+    updatePricing().catch(console.error);
+  }, 1000);
   
   // 每2小时更新一次
   setInterval(() => {
