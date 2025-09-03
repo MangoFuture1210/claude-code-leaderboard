@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Stats Dashboard</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Claude Code 使用统计</h1>
+      <div class="controls">
+        <select id="period">
+          <option value="1d">今天</option>
+          <option value="7d" selected>最近7天</option>
+          <option value="30d">最近30天</option>
+          <option value="all">全部</option>
+        </select>
+        <button id="refresh-btn">
+          <span class="refresh-icon">↻</span> 刷新
+        </button>
+        <span id="last-updated" class="last-updated"></span>
+      </div>
+    </header>
+
+    <!-- 统计卡片 -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">总令牌数</div>
+        <div class="stat-value" id="total-tokens">-</div>
+        <div class="stat-change" id="tokens-change"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">活跃用户</div>
+        <div class="stat-value" id="user-count">-</div>
+        <div class="stat-change" id="users-change"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">会话数</div>
+        <div class="stat-value" id="session-count">-</div>
+        <div class="stat-change" id="sessions-change"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">交互次数</div>
+        <div class="stat-value" id="record-count">-</div>
+        <div class="stat-change" id="records-change"></div>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <!-- 左侧：排行榜 -->
+      <div class="rankings-section">
+        <h2>🏆 用户排行榜</h2>
+        <div class="table-container">
+          <table id="rankings-table">
+            <thead>
+              <tr>
+                <th>排名</th>
+                <th>用户</th>
+                <th>总令牌</th>
+                <th>会话</th>
+                <th>最后活动</th>
+              </tr>
+            </thead>
+            <tbody id="rankings-tbody">
+              <tr><td colspan="5" class="loading">加载中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 右侧：图表 -->
+      <div class="charts-section">
+        <div class="chart-container">
+          <h3>📈 使用趋势</h3>
+          <canvas id="trend-chart"></canvas>
+        </div>
+        <div class="chart-container">
+          <h3>👥 用户分布</h3>
+          <canvas id="user-chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- 最近活动 -->
+    <div class="activity-section">
+      <h2>🕐 最近活动</h2>
+      <div class="table-container">
+        <table id="activity-table">
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>用户</th>
+              <th>模型</th>
+              <th>输入令牌</th>
+              <th>输出令牌</th>
+              <th>总计</th>
+            </tr>
+          </thead>
+          <tbody id="activity-tbody">
+            <tr><td colspan="6" class="loading">加载中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

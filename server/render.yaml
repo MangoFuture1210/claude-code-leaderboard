@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: claude-stats
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    disk:
+      name: sqlite-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_PATH
+        value: /data/stats.db
+      - key: PORT
+        generateValue: true
