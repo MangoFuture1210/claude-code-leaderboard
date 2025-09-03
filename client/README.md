@@ -34,8 +34,9 @@ claude-stats init
 
 系统会提示您输入：
 - **用户名**: 用于识别您的数据（建议使用英文）
-- **服务器地址**: 统计服务器的 URL
 - **是否启用**: 是否立即启用跟踪
+
+服务器地址已内置：`https://claude-code-leaderboard.onrender.com`
 
 ### 2. 查看统计
 
@@ -92,7 +93,7 @@ claude-stats dashboard
 ```json
 {
   "username": "your_username",
-  "serverUrl": "http://localhost:3000",
+  "serverUrl": "https://claude-code-leaderboard.onrender.com",
   "enabled": true,
   "createdAt": "2024-01-01T00:00:00.000Z"
 }
@@ -164,13 +165,14 @@ node bin/cli.js --help
 npm link
 ```
 
-## 服务器要求
+## 服务器
 
-客户端需要配合 Claude Stats Server 使用。服务器应提供以下端点：
-
-- `POST /api/usage/submit`: 接收使用数据
-- `GET /api/stats/user/:username`: 获取用户统计
-- Web Dashboard 界面
+客户端默认连接到公共服务器：
+- 地址：`https://claude-code-leaderboard.onrender.com`
+- Dashboard：直接访问上述地址查看
+- API 端点：
+  - `POST /api/usage/submit`: 提交使用数据
+  - `GET /api/stats/user/:username`: 获取用户统计
 
 ## License
 

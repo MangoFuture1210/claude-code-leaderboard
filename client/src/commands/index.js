@@ -32,7 +32,10 @@ export async function initCommand() {
     }
   }
   
-  // 收集配置信息
+  // 默认服务器地址
+  const DEFAULT_SERVER_URL = 'https://claude-code-leaderboard.onrender.com';
+  
+  // 收集配置信息（简化版，不再询问服务器地址）
   const answers = await inquirer.prompt([
     {
       type: 'input',
@@ -50,20 +53,6 @@ export async function initCommand() {
       }
     },
     {
-      type: 'input',
-      name: 'serverUrl',
-      message: '服务器地址:',
-      default: existingConfig?.serverUrl || 'http://localhost:3000',
-      validate: input => {
-        try {
-          new URL(input);
-          return true;
-        } catch {
-          return '请输入有效的 URL';
-        }
-      }
-    },
-    {
       type: 'confirm',
       name: 'enabled',
       message: '立即启用数据跟踪？',
@@ -71,13 +60,10 @@ export async function initCommand() {
     }
   ]);
   
-  // 清理 URL（移除尾部斜杠）
-  answers.serverUrl = answers.serverUrl.replace(/\/$/, '');
-  
-  // 保存配置
+  // 保存配置（使用默认服务器地址）
   const config = {
     username: answers.username,
-    serverUrl: answers.serverUrl,
+    serverUrl: DEFAULT_SERVER_URL,
     enabled: answers.enabled,
     createdAt: new Date().toISOString()
   };
@@ -220,19 +206,22 @@ export async function configCommand(options) {
   }
   
   if (options.edit) {
-    // 编辑配置
+    // 编辑配置（简化版，不允许修改服务器地址）
     const answers = await inquirer.prompt([
       {
         type: 'input',
         name: 'username',
         message: '用户名:',
-        default: config.username
-      },
-      {
-        type: 'input',
-        name: 'serverUrl',
-        message: '服务器地址:',
-        default: config.serverUrl
+        default: config.username,
+        validate: input => {
+          if (input.length < 1 || input.length > 50) {
+            return '用户名长度应在 1-50 个字符之间';
+          }
+          if (!/^[a-zA-Z0-9_-]+$/.test(input)) {
+            return '用户名只能包含字母、数字、下划线和连字符';
+          }
+          return true;
+        }
       },
       {
         type: 'confirm',
@@ -244,7 +233,8 @@ export async function configCommand(options) {
     
     const newConfig = {
       ...config,
-      ...answers,
+      username: answers.username,
+      enabled: answers.enabled,
       updatedAt: new Date().toISOString()
     };
     

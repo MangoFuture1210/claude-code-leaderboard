@@ -166,6 +166,9 @@ async function sendToServer(config, usage) {
   });
 }
 
+// 默认服务器地址
+const DEFAULT_SERVER_URL = 'https://claude-code-leaderboard.onrender.com';
+
 // 主函数
 async function main() {
   try {
@@ -184,6 +187,11 @@ async function main() {
         process.exit(0);
       }
       
+      // 使用默认服务器地址（如果配置中没有）
+      if (!config.serverUrl) {
+        config.serverUrl = DEFAULT_SERVER_URL;
+      }
+      
       // 获取最新使用记录
       const usage = await getLatestUsageEntry();
       if (!usage) {
@@ -196,6 +204,11 @@ async function main() {
       // 使用注入的配置
       if (!STATS_CONFIG.enabled) {
         process.exit(0);
+      }
+      
+      // 使用默认服务器地址（如果配置中没有）
+      if (!STATS_CONFIG.serverUrl) {
+        STATS_CONFIG.serverUrl = DEFAULT_SERVER_URL;
       }
       
       // 获取最新使用记录

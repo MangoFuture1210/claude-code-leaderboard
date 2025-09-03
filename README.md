@@ -66,10 +66,11 @@ npx claude-stats init
 ```bash
 claude-stats init
 
-# 输入配置信息
+# 只需输入用户名即可
 > 用户名: john_doe
-> 服务器: https://your-app.onrender.com
 > 启用跟踪: Yes
+
+# 服务器已部署在：https://claude-code-leaderboard.onrender.com
 ```
 
 ## 📊 使用方法
@@ -95,7 +96,7 @@ claude-stats reset
 
 ### Web Dashboard
 
-访问服务器地址即可查看：
+访问 https://claude-code-leaderboard.onrender.com 即可查看：
 - 实时统计数据
 - 用户排行榜
 - 使用趋势图表
