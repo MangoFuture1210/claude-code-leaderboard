@@ -123,7 +123,9 @@ async function findJsonlFiles(dir) {
 // 发送数据到服务器
 async function sendToServer(config, usage) {
   return new Promise((resolve, reject) => {
-    const url = new URL(config.serverUrl + '/api/usage/submit');
+    // 确保 serverUrl 末尾没有斜杠
+    const baseUrl = config.serverUrl.replace(/\/$/, '');
+    const url = new URL(baseUrl + '/api/usage/submit');
     const data = JSON.stringify({
       username: config.username,
       usage: usage
