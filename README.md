@@ -31,11 +31,18 @@ claude-stats init
 ```bash
 claude-stats init
 
-# 只需输入用户名即可
+# 输入用户名
 > 用户名: john_doe
+> 使用自定义服务器？ No  # 选择 No 使用公共服务器，Yes 使用自己的服务器
 > 启用跟踪: Yes
 
-# ✅ 完成！数据会自动上传到公共服务器
+# ✅ 完成！数据会自动上传到配置的服务器
+```
+
+如果选择自定义服务器：
+```bash
+> 使用自定义服务器？ Yes
+> 服务器地址: https://your-server.com
 ```
 
 ### 3. 查看统计
@@ -114,23 +121,50 @@ npm link  # 本地全局安装
 claude-stats init
 ```
 
-### 部署自己的服务器（可选）
+### 部署自己的服务器
 
-如果不想使用公共服务器，可以部署自己的：
+虽然提供了公共服务器，但你也可以部署自己的私有服务器：
 
-#### Render 部署
-1. Fork 此仓库
-2. 在 [Render](https://render.com) 创建 Web Service
-3. 连接 GitHub 仓库的 `server` 目录
-4. 添加 Disk：
-   - Mount Path: `/data`
-   - Size: 1GB
-5. 设置环境变量：
+#### 方式一：Render 部署（推荐）
+1. Fork 此仓库到你的 GitHub
+2. 在 [Render](https://render.com) 创建新的 Web Service
+3. 连接你的 GitHub 仓库，设置：
+   - **Root Directory**: `server`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+4. 添加持久化磁盘（Persistent Disk）：
+   - **Name**: `stats-data`
+   - **Mount Path**: `/data`
+   - **Size**: 1GB (免费套餐足够)
+5. 添加环境变量：
    ```
    NODE_ENV=production
    DB_PATH=/data/stats.db
    ```
-6. 部署完成后修改客户端的服务器地址
+6. 部署完成后，记录服务器 URL（如 `https://your-app.onrender.com`）
+7. 客户端配置时选择自定义服务器并输入你的服务器地址
+
+#### 方式二：本地部署
+```bash
+# 克隆仓库
+git clone https://github.com/your-fork/claude-code-leaderboard.git
+cd claude-code-leaderboard/server
+
+# 安装依赖
+npm install
+
+# 启动服务器
+npm start
+
+# 服务器运行在 http://localhost:3000
+```
+
+#### 方式三：Docker 部署
+```bash
+cd server
+docker build -t claude-stats-server .
+docker run -p 3000:3000 -v ./data:/data claude-stats-server
+```
 
 ## 📡 API 接口
 

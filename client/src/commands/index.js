@@ -35,7 +35,7 @@ export async function initCommand() {
   // 默认服务器地址
   const DEFAULT_SERVER_URL = 'https://claude-code-leaderboard.onrender.com';
   
-  // 收集配置信息（简化版，不再询问服务器地址）
+  // 收集配置信息
   const answers = await inquirer.prompt([
     {
       type: 'input',
@@ -54,16 +54,37 @@ export async function initCommand() {
     },
     {
       type: 'confirm',
+      name: 'useCustomServer',
+      message: '使用自定义服务器？（否则使用公共服务器）',
+      default: false
+    },
+    {
+      type: 'input',
+      name: 'serverUrl',
+      message: '服务器地址:',
+      default: existingConfig?.serverUrl || DEFAULT_SERVER_URL,
+      when: answers => answers.useCustomServer,
+      validate: input => {
+        try {
+          new URL(input);
+          return true;
+        } catch {
+          return '请输入有效的 URL 地址';
+        }
+      }
+    },
+    {
+      type: 'confirm',
       name: 'enabled',
       message: '立即启用数据跟踪？',
       default: true
     }
   ]);
   
-  // 保存配置（使用默认服务器地址）
+  // 保存配置
   const config = {
     username: answers.username,
-    serverUrl: DEFAULT_SERVER_URL,
+    serverUrl: answers.serverUrl || DEFAULT_SERVER_URL,
     enabled: answers.enabled,
     createdAt: new Date().toISOString()
   };
@@ -206,7 +227,10 @@ export async function configCommand(options) {
   }
   
   if (options.edit) {
-    // 编辑配置（简化版，不允许修改服务器地址）
+    // 编辑配置
+    const DEFAULT_SERVER_URL = 'https://claude-code-leaderboard.onrender.com';
+    const isCustomServer = config.serverUrl !== DEFAULT_SERVER_URL;
+    
     const answers = await inquirer.prompt([
       {
         type: 'input',
@@ -225,6 +249,27 @@ export async function configCommand(options) {
       },
       {
         type: 'confirm',
+        name: 'useCustomServer',
+        message: '使用自定义服务器？',
+        default: isCustomServer
+      },
+      {
+        type: 'input',
+        name: 'serverUrl',
+        message: '服务器地址:',
+        default: config.serverUrl,
+        when: answers => answers.useCustomServer,
+        validate: input => {
+          try {
+            new URL(input);
+            return true;
+          } catch {
+            return '请输入有效的 URL 地址';
+          }
+        }
+      },
+      {
+        type: 'confirm',
         name: 'enabled',
         message: '启用跟踪:',
         default: config.enabled
@@ -234,6 +279,7 @@ export async function configCommand(options) {
     const newConfig = {
       ...config,
       username: answers.username,
+      serverUrl: answers.serverUrl || (answers.useCustomServer === false ? DEFAULT_SERVER_URL : config.serverUrl),
       enabled: answers.enabled,
       updatedAt: new Date().toISOString()
     };
