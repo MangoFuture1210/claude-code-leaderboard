@@ -34,9 +34,8 @@ claude-stats init
 
 系统会提示您输入：
 - **用户名**: 用于识别您的数据（建议使用英文）
+- **服务器地址**: 统计服务器的 URL
 - **是否启用**: 是否立即启用跟踪
-
-服务器地址已内置：`https://claude-code-leaderboard.onrender.com`
 
 ### 2. 查看统计
 
@@ -93,7 +92,7 @@ claude-stats dashboard
 ```json
 {
   "username": "your_username",
-  "serverUrl": "https://claude-code-leaderboard.onrender.com",
+  "serverUrl": "<your-server-url>",
   "enabled": true,
   "createdAt": "2024-01-01T00:00:00.000Z"
 }
@@ -167,12 +166,14 @@ npm link
 
 ## 服务器
 
-客户端默认连接到公共服务器：
-- 地址：`https://claude-code-leaderboard.onrender.com`
-- Dashboard：直接访问上述地址查看
+客户端可以连接到任何部署的统计服务器：
+- 配置地址：在初始化时设置或编辑 `~/.claude/stats-config.json`
+- Dashboard：直接访问服务器地址查看
 - API 端点：
   - `POST /api/usage/submit`: 提交使用数据
   - `GET /api/stats/user/:username`: 获取用户统计
+  - `GET /api/stats/rankings`: 获取排行榜
+  - `GET /api/stats/pricing`: 获取价格信息
 
 ## License
 

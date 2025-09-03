@@ -73,7 +73,7 @@ claude-stats init
 #### 配置
 - 配置文件: `~/.claude/stats-config.json`
 - Hook 脚本: `~/.claude/claude_stats_hook.js`
-- 服务器地址硬编码: `https://claude-code-leaderboard.onrender.com`
+- 服务器地址: 在 `stats-config.json` 中配置 `serverUrl`
 
 #### Hook 机制
 1. 在 Claude Code Stop Hook 中注册
@@ -108,19 +108,28 @@ claude-stats reset     # 重置配置
 1. **数据库单例**: 服务端使用单例模式，所有模块共享同一个数据库实例
 2. **无认证设计**: 适合内部团队使用，不适合公开部署
 3. **静默失败**: Hook 脚本失败不会影响 Claude Code 运行
-4. **服务器地址**: 硬编码为 `https://claude-code-leaderboard.onrender.com`
+4. **服务器地址**: 可通过客户端配置文件自定义服务器地址
 
 ## 故障排查
 
 ### 服务器 500 错误
-- 检查数据库是否初始化: `curl https://claude-code-leaderboard.onrender.com/health`
+- 检查数据库是否初始化: `curl <your-server-url>/health`
 - 确认使用正确的数据库单例实例
+- 检查 DATA_DIR 环境变量是否正确配置
+- 验证数据目录权限是否正确
 
 ### Hook 不触发
 - 检查 `~/.claude/settings.json` 中的 Hook 配置
 - 确认 Hook 脚本有执行权限
+- 运行 `claude-stats test` 测试 Hook 功能
 
 ### 统计数据不显示
 - 确认用户名正确
 - 检查是否有数据提交成功
 - 访问 Dashboard 查看是否有数据
+- 查看价格信息: `curl <your-server-url>/api/stats/pricing`
+
+### 成本计算异常
+- 确认价格数据已更新: 检查 `/data/pricing.json` 或 `./data/pricing.json`
+- 验证模型名称是否在价格表中存在
+- 检查服务器日志了解价格获取状态
