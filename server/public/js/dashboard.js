@@ -6,12 +6,31 @@ class Dashboard {
   }
 
   async init() {
+    await this.checkStorageConfig();
     await this.loadData();
     this.setupEventListeners();
     this.initCharts();
     
     // 自动刷新每60秒
     setInterval(() => this.loadData(), 60000);
+  }
+
+  async checkStorageConfig() {
+    try {
+      const response = await fetch('/api/stats/config');
+      const config = await response.json();
+      
+      if (!config.persistent_storage) {
+        // 显示警告横幅
+        const warningBanner = document.getElementById('storage-warning');
+        if (warningBanner) {
+          warningBanner.style.display = 'block';
+          document.body.classList.add('has-warning');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check storage config:', error);
+    }
   }
 
   async loadData() {

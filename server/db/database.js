@@ -2,14 +2,13 @@ import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 import path from 'path';
 import fs from 'fs/promises';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { getDataDir } from '../utils/dataDir.js';
 
 export class Database {
   constructor() {
-    // 在 Render 上使用 /data 目录，本地使用项目目录
-    this.dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'stats.db');
+    // 使用 DATA_DIR 环境变量指定的目录
+    const dataDir = getDataDir();
+    this.dbPath = path.join(dataDir, 'stats.db');
     this.db = null;
   }
 

@@ -8,6 +8,11 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+  <!-- 数据持久化警告 -->
+  <div id="storage-warning" class="warning-banner" style="display:none;">
+    ⚠️ 警告：数据未持久化！重新部署将丢失所有数据。请在环境变量中设置 DATA_DIR 并挂载磁盘。
+  </div>
+  
   <div class="container">
     <header>
       <h1>Claude Code 使用统计</h1>

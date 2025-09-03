@@ -2,14 +2,7 @@ import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// 获取数据存储路径（Render Disk 或本地）
-const getDataPath = () => {
-  return process.env.DB_PATH ? '/data' : path.join(__dirname, '..', 'data');
-};
+import { getDataDir } from './dataDir.js';
 
 /**
  * 从 Anthropic 官网获取最新价格
@@ -158,8 +151,8 @@ function normalizeModelName(name) {
  * 保存价格到文件
  */
 async function savePricing(prices) {
-  const dataPath = getDataPath();
-  const pricingFile = path.join(dataPath, 'pricing.json');
+  const dataDir = getDataDir();
+  const pricingFile = path.join(dataDir, 'pricing.json');
   
   const data = {
     updated: new Date().toISOString(),
@@ -182,8 +175,8 @@ async function savePricing(prices) {
  * 加载缓存的价格
  */
 export async function loadCachedPricing() {
-  const dataPath = getDataPath();
-  const pricingFile = path.join(dataPath, 'pricing.json');
+  const dataDir = getDataDir();
+  const pricingFile = path.join(dataDir, 'pricing.json');
   
   try {
     const data = await fs.readFile(pricingFile, 'utf-8');

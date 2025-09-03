@@ -1,6 +1,12 @@
 import { Router } from 'express';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import db from '../db/database.js';
 import { calculateCost } from '../utils/pricing.js';
+import { getStorageConfig, getDataDir } from '../utils/dataDir.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const router = Router();
 
@@ -173,6 +179,19 @@ router.get('/activity', async (req, res) => {
   }
 });
 
+// 获取存储配置
+router.get('/config', async (req, res) => {
+  try {
+    const config = getStorageConfig();
+    res.json(config);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to get configuration',
+      message: error.message
+    });
+  }
+});
+
 // 调试端点 - 检查数据库状态
 router.get('/debug', async (req, res) => {
   try {
@@ -187,12 +206,37 @@ router.get('/debug', async (req, res) => {
     const recordCount = await db.db.get('SELECT COUNT(*) as count FROM usage_records');
     const viewTest = await db.db.all('SELECT * FROM user_rankings LIMIT 3');
     
+    // 获取数据目录和文件路径
+    const dataDir = getDataDir();
+    const pricingPath = path.join(dataDir, 'pricing.json');
+    
+    let pricingExists = false;
+    try {
+      await fs.access(pricingPath);
+      pricingExists = true;
+    } catch (e) {
+      pricingExists = false;
+    }
+    
+    // 获取存储配置
+    const storageConfig = getStorageConfig();
+    
     res.json({
-      database_path: process.env.DB_PATH || 'local',
-      tables: tables.map(t => t.name),
-      user_count: userCount?.count || 0,
-      record_count: recordCount?.count || 0,
-      view_working: viewTest.length > 0,
+      environment: {
+        DATA_DIR: process.env.DATA_DIR || 'not set (using source directory)',
+        data_directory: dataDir,
+        persistent_storage: storageConfig.persistent_storage,
+        database_file: db.dbPath,
+        pricing_file: pricingPath,
+        pricing_exists: pricingExists
+      },
+      database: {
+        tables: tables.map(t => t.name),
+        user_count: userCount?.count || 0,
+        record_count: recordCount?.count || 0,
+        view_working: viewTest.length > 0
+      },
+      storage_warning: storageConfig.warning,
       sample_data: viewTest
     });
   } catch (error) {
