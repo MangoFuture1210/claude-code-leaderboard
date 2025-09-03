@@ -3,7 +3,7 @@ import cors from 'cors';
 import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Database } from './db/database.js';
+import db from './db/database.js';  // 导入单例
 import usageRoutes from './routes/usage.js';
 import statsRoutes from './routes/stats.js';
 
@@ -13,7 +13,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // 初始化数据库
-const db = new Database();
 await db.init();
 
 // 中间件
