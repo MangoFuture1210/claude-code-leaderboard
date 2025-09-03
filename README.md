@@ -2,8 +2,6 @@
 
 简单、无认证的 Claude Code 使用统计系统，适合团队内部使用。
 
-🌐 **在线 Dashboard**: https://claude-code-leaderboard.onrender.com
-
 ## 🎯 特性
 
 - 📊 自动跟踪 Claude Code 使用数据
@@ -11,9 +9,13 @@
 - 📈 美观的 Web Dashboard 实时展示
 - 💾 SQLite 数据库，易于部署
 - 🔧 一键安装配置
-- ☁️ 已部署的公共服务器
+- 🏢 支持团队自建服务器
 
-## 🚀 快速开始（用户）
+## 🚀 快速开始
+
+### 前提条件
+
+需要先部署服务器（见下方部署说明）或使用团队已有的服务器地址。
 
 ### 1. 安装客户端
 
@@ -31,18 +33,12 @@ claude-stats init
 ```bash
 claude-stats init
 
-# 输入用户名
+# 配置示例
 > 用户名: john_doe
-> 使用自定义服务器？ No  # 选择 No 使用公共服务器，Yes 使用自己的服务器
+> 服务器地址: https://your-team-server.com  # 必须提供服务器地址
 > 启用跟踪: Yes
 
 # ✅ 完成！数据会自动上传到配置的服务器
-```
-
-如果选择自定义服务器：
-```bash
-> 使用自定义服务器？ Yes
-> 服务器地址: https://your-server.com
 ```
 
 ### 3. 查看统计
@@ -73,7 +69,7 @@ claude-stats dashboard
 
 ### Web Dashboard 功能
 
-访问 https://claude-code-leaderboard.onrender.com 查看：
+访问你的服务器地址查看：
 - 📊 实时统计数据
 - 🏆 用户排行榜
 - 📈 使用趋势图表
@@ -121,9 +117,9 @@ npm link  # 本地全局安装
 claude-stats init
 ```
 
-### 部署自己的服务器
+## 🖥️ 部署服务器
 
-虽然提供了公共服务器，但你也可以部署自己的私有服务器：
+团队需要先部署自己的服务器，以下是几种部署方式：
 
 #### 方式一：Render 部署（推荐）
 1. Fork 此仓库到你的 GitHub
@@ -215,14 +211,14 @@ A: 检查 `~/.claude/settings.json` 文件中是否有 `claude_stats_hook.js` �
 ### Q: 数据多久同步一次？
 A: 每次 Claude Code 会话结束时自动同步。
 
-### Q: 如何修改用户名？
+### Q: 如何修改用户名或服务器地址？
 A: 运行 `claude-stats config --edit` 修改配置。
 
 ### Q: 服务器返回 500 错误？
 A: 可能是数据库初始化问题，稍等片刻让服务器重启，或检查 `/health` 端点。
 
-### Q: 可以删除历史数据吗？
-A: 目前需要联系管理员手动删除，未来会添加此功能。
+### Q: 没有服务器地址怎么办？
+A: 必须先部署服务器或从团队管理员获取服务器地址，客户端无法在没有服务器的情况下工作。
 
 ## 🔒 隐私说明
 
