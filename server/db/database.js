@@ -242,33 +242,44 @@ export class Database {
 
   // 获取用户排行榜
   async getUserRankings(limit = 20) {
-    const sql = `
-      SELECT 
-        u.username,
-        u.total_usage,
-        u.session_count,
-        u.rank,
-        u.first_seen,
-        u.last_seen,
-        COALESCE(SUM(r.input_tokens), 0) as total_input_tokens,
-        COALESCE(SUM(r.output_tokens), 0) as total_output_tokens,
-        COALESCE(SUM(r.cache_creation_tokens), 0) as total_cache_creation_tokens,
-        COALESCE(SUM(r.cache_read_tokens), 0) as total_cache_read_tokens,
-        (
-          SELECT model FROM usage_records 
-          WHERE username = u.username 
-          GROUP BY model 
-          ORDER BY COUNT(*) DESC 
-          LIMIT 1
-        ) as primary_model
-      FROM user_rankings u
-      LEFT JOIN usage_records r ON u.username = r.username
-      GROUP BY u.username, u.total_usage, u.session_count, u.rank, u.first_seen, u.last_seen
-      ORDER BY u.rank
+    // 先使用简单查询获取基本数据
+    const basicSql = `
+      SELECT * FROM user_rankings
       LIMIT ?
     `;
-
-    return await this.db.all(sql, [limit]);
+    
+    const rankings = await this.db.all(basicSql, [limit]);
+    
+    // 为每个用户补充详细的 token 信息
+    for (const user of rankings) {
+      const tokenSql = `
+        SELECT 
+          COALESCE(SUM(input_tokens), 0) as total_input_tokens,
+          COALESCE(SUM(output_tokens), 0) as total_output_tokens,
+          COALESCE(SUM(cache_creation_tokens), 0) as total_cache_creation_tokens,
+          COALESCE(SUM(cache_read_tokens), 0) as total_cache_read_tokens
+        FROM usage_records
+        WHERE username = ?
+      `;
+      
+      const tokenData = await this.db.get(tokenSql, [user.username]);
+      Object.assign(user, tokenData);
+      
+      // 获取最常用的模型
+      const modelSql = `
+        SELECT model, COUNT(*) as count
+        FROM usage_records
+        WHERE username = ?
+        GROUP BY model
+        ORDER BY count DESC
+        LIMIT 1
+      `;
+      
+      const modelData = await this.db.get(modelSql, [user.username]);
+      user.primary_model = modelData?.model || null;
+    }
+    
+    return rankings;
   }
 
   // 获取最近记录

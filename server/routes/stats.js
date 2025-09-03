@@ -14,23 +14,33 @@ router.get('/overview', async (req, res) => {
     const rankings = await db.getUserRankings(10);
     const recent = await db.getRecentRecords(20);
 
-    // 计算排行榜中每个用户的成本
-    const rankingsWithCost = await Promise.all(rankings.map(async user => ({
-      ...user,
-      total_cost: await calculateCost({
-        input_tokens: user.total_input_tokens || 0,
-        output_tokens: user.total_output_tokens || 0,
-        cache_creation_tokens: user.total_cache_creation_tokens || 0,
-        cache_read_tokens: user.total_cache_read_tokens || 0,
-        model: user.primary_model || 'claude-3-5-sonnet-20241022'
-      })
-    })));
+    // 计算排行榜中每个用户的成本（添加错误处理）
+    const rankingsWithCost = await Promise.all(rankings.map(async user => {
+      try {
+        const cost = await calculateCost({
+          input_tokens: user.total_input_tokens || 0,
+          output_tokens: user.total_output_tokens || 0,
+          cache_creation_tokens: user.total_cache_creation_tokens || 0,
+          cache_read_tokens: user.total_cache_read_tokens || 0,
+          model: user.primary_model || 'claude-3-5-sonnet-20241022'
+        });
+        return { ...user, total_cost: cost };
+      } catch (error) {
+        console.error('Error calculating cost for user:', user.username, error);
+        return { ...user, total_cost: 0 };
+      }
+    }));
 
-    // 计算最近活动的成本
-    const recentWithCost = await Promise.all(recent.map(async record => ({
-      ...record,
-      cost: await calculateCost(record)
-    })));
+    // 计算最近活动的成本（添加错误处理）
+    const recentWithCost = await Promise.all(recent.map(async record => {
+      try {
+        const cost = await calculateCost(record);
+        return { ...record, cost };
+      } catch (error) {
+        console.error('Error calculating cost for record:', error);
+        return { ...record, cost: 0 };
+      }
+    }));
 
     res.json({
       period,
