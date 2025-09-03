@@ -78,15 +78,25 @@ program
     }
   });
 
+// 主函数
+async function main() {
+  try {
+    await program.parseAsync(process.argv);
+  } catch (error) {
+    if (error.code === 'commander.help' || error.code === 'commander.helpDisplayed') {
+      process.exit(0);
+    }
+    if (error.code === 'commander.unknownCommand' || error.code === 'commander.unknownOption') {
+      console.error(chalk.red('错误:'), error.message);
+      process.exit(1);
+    }
+    // 其他错误直接退出，不显示错误信息
+    process.exit(0);
+  }
+}
+
 // 错误处理
 program.exitOverride();
 
-try {
-  await program.parseAsync(process.argv);
-} catch (error) {
-  if (error.code === 'commander.help') {
-    process.exit(0);
-  }
-  console.error(chalk.red('错误:'), error.message);
-  process.exit(1);
-}
+// 运行主函数
+main();
