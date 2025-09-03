@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import db from './db/database.js';  // 导入单例
 import usageRoutes from './routes/usage.js';
 import statsRoutes from './routes/stats.js';
+import { initPricingUpdater } from './utils/fetchPricing.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -14,6 +15,9 @@ const PORT = process.env.PORT || 3000;
 
 // 初始化数据库
 await db.init();
+
+// 初始化价格更新器
+initPricingUpdater();
 
 // 中间件
 app.use(cors());

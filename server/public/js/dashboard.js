@@ -68,19 +68,21 @@ class Dashboard {
     const tbody = document.getElementById('rankings-tbody');
     
     if (!rankings || rankings.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="loading">暂无数据</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="loading">暂无数据</td></tr>';
       return;
     }
     
     tbody.innerHTML = rankings.map((user, index) => {
       const rankBadge = this.getRankBadge(user.rank);
       const lastSeenText = this.formatTime(user.last_seen);
+      const costText = this.formatCost(user.total_cost);
       
       return `
         <tr>
           <td>${rankBadge}</td>
           <td><strong>${this.escapeHtml(user.username)}</strong></td>
           <td>${this.formatNumber(user.total_usage)}</td>
+          <td>${costText}</td>
           <td>${user.session_count}</td>
           <td>${lastSeenText}</td>
         </tr>
@@ -92,13 +94,14 @@ class Dashboard {
     const tbody = document.getElementById('activity-tbody');
     
     if (!records || records.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="loading">暂无活动</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="loading">暂无活动</td></tr>';
       return;
     }
     
     tbody.innerHTML = records.map(record => {
       const timeText = this.formatTime(record.timestamp);
       const modelName = this.formatModel(record.model);
+      const costText = this.formatCost(record.cost);
       
       return `
         <tr>
@@ -108,6 +111,7 @@ class Dashboard {
           <td>${this.formatNumber(record.input_tokens)}</td>
           <td>${this.formatNumber(record.output_tokens)}</td>
           <td><strong>${this.formatNumber(record.total_tokens)}</strong></td>
+          <td>${costText}</td>
         </tr>
       `;
     }).join('');
@@ -278,10 +282,13 @@ class Dashboard {
     if (!model) return 'Unknown';
     
     const modelMap = {
-      'claude-3-opus': 'Opus',
-      'claude-3-sonnet': 'Sonnet',
-      'claude-3-haiku': 'Haiku',
+      'opus-4-1': 'Opus 4.1',
+      'claude-3-opus': 'Opus 3',
+      'claude-3-sonnet': 'Sonnet 3',
+      'claude-3-haiku': 'Haiku 3',
+      'claude-3-5-sonnet': 'Sonnet 3.5',
       'claude-3.5-sonnet': 'Sonnet 3.5',
+      'claude-3-5-haiku': 'Haiku 3.5',
       'claude-3.5-haiku': 'Haiku 3.5'
     };
     
@@ -292,6 +299,18 @@ class Dashboard {
     }
     
     return model.split('-').pop() || model;
+  }
+
+  formatCost(cost) {
+    if (cost === null || cost === undefined) return '$0.00';
+    
+    if (cost < 0.01) {
+      return `$${cost.toFixed(4)}`;
+    } else if (cost < 1) {
+      return `$${cost.toFixed(3)}`;
+    } else {
+      return `$${cost.toFixed(2)}`;
+    }
   }
 
   getRankBadge(rank) {

@@ -243,7 +243,28 @@ export class Database {
   // 获取用户排行榜
   async getUserRankings(limit = 20) {
     const sql = `
-      SELECT * FROM user_rankings
+      SELECT 
+        u.username,
+        u.total_usage,
+        u.session_count,
+        u.rank,
+        u.first_seen,
+        u.last_seen,
+        COALESCE(SUM(r.input_tokens), 0) as total_input_tokens,
+        COALESCE(SUM(r.output_tokens), 0) as total_output_tokens,
+        COALESCE(SUM(r.cache_creation_tokens), 0) as total_cache_creation_tokens,
+        COALESCE(SUM(r.cache_read_tokens), 0) as total_cache_read_tokens,
+        (
+          SELECT model FROM usage_records 
+          WHERE username = u.username 
+          GROUP BY model 
+          ORDER BY COUNT(*) DESC 
+          LIMIT 1
+        ) as primary_model
+      FROM user_rankings u
+      LEFT JOIN usage_records r ON u.username = r.username
+      GROUP BY u.username, u.total_usage, u.session_count, u.rank, u.first_seen, u.last_seen
+      ORDER BY u.rank
       LIMIT ?
     `;
 
@@ -255,8 +276,9 @@ export class Database {
     const sql = `
       SELECT 
         username, timestamp, model,
-        input_tokens, output_tokens, total_tokens,
-        session_id
+        input_tokens, output_tokens, 
+        cache_creation_tokens, cache_read_tokens,
+        total_tokens, session_id
       FROM usage_records
       ORDER BY timestamp DESC
       LIMIT ?
