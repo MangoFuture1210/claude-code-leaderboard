@@ -246,7 +246,15 @@ class Dashboard {
   formatTime(timestamp) {
     if (!timestamp) return '-';
     
-    const date = new Date(timestamp);
+    // 处理 SQLite 返回的 UTC 时间字符串
+    // 如果时间戳不包含时区信息，添加 'Z' 表示 UTC
+    let dateStr = timestamp;
+    if (!timestamp.includes('Z') && !timestamp.includes('+') && !timestamp.includes('-')) {
+      // 如果没有时区标识，假设是 UTC 时间
+      dateStr = timestamp.replace(' ', 'T') + 'Z';
+    }
+    
+    const date = new Date(dateStr);
     const now = new Date();
     const diff = now - date;
     

@@ -128,8 +128,8 @@ export class Database {
         total_usage,
         session_count,
         RANK() OVER (ORDER BY total_usage DESC) as rank,
-        first_seen,
-        last_seen
+        strftime('%Y-%m-%dT%H:%M:%S.000Z', first_seen) as first_seen,
+        strftime('%Y-%m-%dT%H:%M:%S.000Z', last_seen) as last_seen
       FROM users
       ORDER BY total_usage DESC;
     `);
