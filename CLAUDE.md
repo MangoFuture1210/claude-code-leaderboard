@@ -2,74 +2,125 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Commands
+## 项目架构
 
-### Development
-- `npm install` - Install all dependencies
-- `npm start` or `node bin/cli.js` - Run the CLI tool
-- `npm run dev` - Development mode (same as npm start)
-- `npm run local-auth` - Test authentication flow locally
-- `npm run local-stats` - Test stats command locally  
-- `npm run local-leaderboard` - Test leaderboard command locally
+这是一个简化的 Claude Code 使用统计系统，分为独立的服务端和客户端。
 
-### Testing & Publishing
-- `npm run pack-test` - Build and install the package globally for testing
-- `npm run unpack-test` - Uninstall the global test package
-- `npm version patch` - Bump patch version for release
-- `npm publish` - Publish to npm registry
+### 目录结构
 
-## Architecture
+```
+claude-code-leaderboard/
+├── server/                 # 服务端 (部署到 Render)
+│   ├── index.js           # Express 主入口
+│   ├── db/
+│   │   └── database.js    # SQLite 数据库管理 (单例模式)
+│   ├── routes/
+│   │   ├── usage.js       # 数据提交 API
+│   │   └── stats.js       # 统计查询 API
+│   └── public/            # Web Dashboard
+│       ├── index.html
+│       ├── css/style.css
+│       └── js/dashboard.js
+│
+└── client/                 # 客户端 CLI
+    ├── bin/cli.js         # CLI 入口
+    ├── src/
+    │   ├── commands/      # 命令实现
+    │   └── utils/         # 工具函数
+    └── hooks/
+        └── count_tokens.js # Claude Hook 脚本
+```
 
-### Core Components
+## 开发指南
 
-**CLI Entry Point** (`bin/cli.js`)
-- Main command handler using Commander.js
-- Handles authentication, reset, and help commands
-- Performs auto-reset checks for version upgrades
-- Ensures hook installation before any command execution
+### 本地开发
 
-**Hook System** (`hooks/count_tokens.js`)
-- Standalone Node.js script executed after Claude Code sessions
-- Scans Claude projects for `.jsonl` usage files
-- Extracts token usage statistics (input, output, cache tokens)
-- Sends data to API endpoint with deduplication via interaction hashes
-- Must maintain CLI_VERSION constant matching package.json version
+```bash
+# 服务端开发
+cd server
+npm install
+npm start  # 启动在 http://localhost:3000
 
-**Authentication Flow** (`src/auth/`)
-- OAuth 1.0a implementation for Twitter authentication
-- Local Express server for callback handling
-- Token storage in `~/.claude/leaderboard.json`
-- Auto-migration and version upgrade handling
+# 客户端开发  
+cd client
+npm install
+npm link   # 本地全局安装
+claude-stats init
+```
 
-**Configuration Management** (`src/utils/config.js`)
-- Manages user configuration in `~/.claude/leaderboard.json`
-- Handles OAuth token encryption/decryption
-- Provides auth status checking
+### 服务端
 
-### Key Design Patterns
+#### 核心组件
+- **Express 服务器**: 处理 API 请求和提供 Dashboard
+- **SQLite 数据库**: 使用单例模式，存储在 `/data/stats.db` (生产) 或 `./data/stats.db` (本地)
+- **无认证**: 通过 username 字段识别用户
 
-1. **Version Management**: CLI_VERSION constant in hook must match package.json version for API compatibility
-2. **Automatic Hook Updates**: Hook script auto-updates when new version detected
-3. **Silent Failures**: Hook operates silently, never blocking Claude Code operations
-4. **Deduplication**: Uses SHA256 hashes of interaction data to prevent duplicate submissions
+#### API 端点
+- `POST /api/usage/submit` - 提交使用数据（无需认证）
+- `GET /api/stats/overview` - 获取总览统计
+- `GET /api/stats/user/:username` - 获取用户统计
+- `GET /api/stats/rankings` - 获取排行榜
+- `GET /api/stats/trends` - 获取趋势数据
 
-### File Installation Locations
-- `~/.claude/count_tokens.js` - The hook script
-- `~/.claude/settings.json` - Claude Code settings with hook registration
-- `~/.claude/leaderboard.json` - User authentication and API configuration
-- `~/.claude/package.json` - Minimal package.json for ES module support
+#### 部署到 Render
+1. 推送代码到 GitHub
+2. 在 Render 创建 Web Service
+3. 添加 Disk: `/data` (1GB)
+4. 环境变量: `DB_PATH=/data/stats.db`
 
-### API Integration
-- Base URL: `https://api.claudecount.com`
-- Endpoints:
-  - `/api/usage/hook` - Submit usage data from hook
-  - `/api/auth/oauth1a/*` - OAuth authentication flow
-  - `/api/users/*` - User management
-- Version checking via `X-CLI-Version` header
-- HTTP 426 response triggers CLI upgrade requirement
+### 客户端
 
-### Error Handling
-- Hook failures exit silently (exit code 0) to avoid blocking Claude Code
-- Version mismatches exit with code 2 to block Claude Code execution
-- Network timeouts set to 10 seconds for API calls
-- Authentication failures provide helpful troubleshooting tips
+#### 配置
+- 配置文件: `~/.claude/stats-config.json`
+- Hook 脚本: `~/.claude/claude_stats_hook.js`
+- 服务器地址硬编码: `https://claude-code-leaderboard.onrender.com`
+
+#### Hook 机制
+1. 在 Claude Code Stop Hook 中注册
+2. 每次会话结束时自动执行
+3. 扫描 `.jsonl` 文件提取使用数据
+4. 发送到服务器（静默失败，不阻塞）
+
+#### Token 计算
+- 从 Claude Code 的 `.jsonl` 文件中解析
+- 提取字段: `input_tokens`, `output_tokens`, `cache_creation_tokens`, `cache_read_tokens`
+- 使用 SHA256 生成交互哈希去重
+
+## 常见命令
+
+### 服务端
+```bash
+npm start              # 启动服务器
+npm run init-db        # 初始化数据库
+```
+
+### 客户端
+```bash
+claude-stats init      # 初始化配置
+claude-stats stats     # 查看统计
+claude-stats dashboard # 打开 Dashboard
+claude-stats toggle    # 启用/禁用跟踪
+claude-stats reset     # 重置配置
+```
+
+## 注意事项
+
+1. **数据库单例**: 服务端使用单例模式，所有模块共享同一个数据库实例
+2. **无认证设计**: 适合内部团队使用，不适合公开部署
+3. **静默失败**: Hook 脚本失败不会影响 Claude Code 运行
+4. **服务器地址**: 硬编码为 `https://claude-code-leaderboard.onrender.com`
+
+## 故障排查
+
+### 服务器 500 错误
+- 检查数据库是否初始化: `curl https://claude-code-leaderboard.onrender.com/health`
+- 确认使用正确的数据库单例实例
+
+### Hook 不触发
+- 检查 `~/.claude/settings.json` 中的 Hook 配置
+- 确认 Hook 脚本有执行权限
+
+### 统计数据不显示
+- 确认用户名正确
+- 检查是否有数据提交成功
+- 访问 Dashboard 查看是否有数据
