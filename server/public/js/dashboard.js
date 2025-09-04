@@ -39,6 +39,12 @@ class Dashboard {
   async initChartsWithRetry() {
     console.log(`[Dashboard] Attempting chart init at ${this.getElapsedTime()}ms`);
     
+    // 如果图表已经初始化，直接返回
+    if (this.charts.trend && this.charts.user) {
+      console.log('[Dashboard] Charts already initialized, skipping');
+      return;
+    }
+    
     const trendCanvas = document.getElementById('trend-chart');
     const userCanvas = document.getElementById('user-chart');
     
@@ -64,6 +70,18 @@ class Dashboard {
       return this.initChartsWithRetry();
     }
     
+    // 销毁已存在的图表实例
+    if (this.charts.trend) {
+      console.log('[Dashboard] Destroying existing trend chart');
+      this.charts.trend.destroy();
+      this.charts.trend = null;
+    }
+    if (this.charts.user) {
+      console.log('[Dashboard] Destroying existing user chart');
+      this.charts.user.destroy();
+      this.charts.user = null;
+    }
+    
     // 初始化图表
     try {
       this.initCharts();
@@ -78,6 +96,13 @@ class Dashboard {
       });
     } catch (error) {
       console.error('[Dashboard] Chart initialization failed:', error);
+      
+      // 如果是 Canvas 已被占用的错误，不要重试
+      if (error.message && error.message.includes('Canvas is already in use')) {
+        console.error('[Dashboard] Canvas reuse error, stopping retry');
+        return;
+      }
+      
       await new Promise(resolve => setTimeout(resolve, 100));
       return this.initChartsWithRetry();
     }
@@ -519,17 +544,24 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('load', () => {
   console.log('[Page] window.onload fired');
   
-  // 如果还没初始化成功，在这里再试一次
-  if (!window.dashboard || !window.dashboard.charts.trend) {
-    console.log('[Page] Reinitializing dashboard on window.load');
+  // 只在没有 dashboard 实例时才创建
+  if (!window.dashboard) {
+    console.log('[Page] Creating dashboard on window.load');
     window.dashboard = new Dashboard();
+  } else if (!window.dashboard.charts.trend) {
+    // 如果实例存在但图表没创建，尝试重新初始化图表
+    console.log('[Page] Dashboard exists but charts missing, retrying init');
+    window.dashboard.init();
   }
 });
 
 // 策略3：延迟初始化保障
 setTimeout(() => {
-  if (!window.dashboard || !window.dashboard.charts.trend) {
-    console.log('[Page] Emergency dashboard init after 2 seconds');
+  if (!window.dashboard) {
+    console.log('[Page] Emergency dashboard creation after 2 seconds');
     window.dashboard = new Dashboard();
+  } else if (!window.dashboard.charts.trend) {
+    console.log('[Page] Emergency chart init after 2 seconds');
+    window.dashboard.init();
   }
 }, 2000);
