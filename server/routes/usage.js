@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import db from '../db/database.js';
-import { normalizeModelName } from '../config/models.js';
+import { normalizeModelName } from '../public/js/models.js';
 
 const router = Router();
 

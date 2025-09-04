@@ -1,51 +1,67 @@
 // 共享的模型配置文件 - 可在客户端和服务端使用
-// 这个文件与 server/config/models.js 保持同步
+// 单一源文件，避免代码重复
 
 export const MODEL_PATTERNS = [
   // Claude 4 系列
   {
     pattern: /claude-sonnet-4-\d{8}/i,
     name: 'Claude 4 Sonnet',
-    category: 'claude-4'
+    category: 'claude-4',
+    cost_per_1k_input: 3.0,
+    cost_per_1k_output: 15.0
   },
   {
     pattern: /claude-opus-4-\d{8}/i,
     name: 'Claude 4 Opus', 
-    category: 'claude-4'
+    category: 'claude-4',
+    cost_per_1k_input: 15.0,
+    cost_per_1k_output: 75.0
   },
   {
     pattern: /claude-haiku-4-\d{8}/i,
     name: 'Claude 4 Haiku',
-    category: 'claude-4'
+    category: 'claude-4',
+    cost_per_1k_input: 0.25,
+    cost_per_1k_output: 1.25
   },
 
   // Claude 3.5 系列
   {
     pattern: /claude-3\.5-sonnet-\d{8}/i,
     name: 'Claude 3.5 Sonnet',
-    category: 'claude-3.5'
+    category: 'claude-3.5',
+    cost_per_1k_input: 3.0,
+    cost_per_1k_output: 15.0
   },
   {
     pattern: /claude-3\.5-haiku-\d{8}/i,
     name: 'Claude 3.5 Haiku',
-    category: 'claude-3.5'
+    category: 'claude-3.5',
+    cost_per_1k_input: 0.8,
+    cost_per_1k_output: 4.0
   },
 
   // Claude 3 系列
   {
     pattern: /claude-3-opus-\d{8}/i,
     name: 'Claude 3 Opus',
-    category: 'claude-3'
+    category: 'claude-3',
+    cost_per_1k_input: 15.0,
+    cost_per_1k_output: 75.0
   },
   {
     pattern: /claude-3-sonnet-\d{8}/i,
     name: 'Claude 3 Sonnet',
-    category: 'claude-3'
+    category: 'claude-3',
+    cost_per_1k_input: 3.0,
+    cost_per_1k_output: 15.0
   },
   {
     pattern: /claude-3-haiku-\d{8}/i,
     name: 'Claude 3 Haiku', 
-    category: 'claude-3'
+    category: 'claude-3',
+    cost_per_1k_input: 0.25,
+    cost_per_1k_output: 1.25
   },
 
   // 通用匹配 (fallback patterns)
@@ -96,7 +112,9 @@ export function normalizeModelName(rawModel) {
       return {
         name: config.name,
         category: config.category,
-        original: rawModel
+        original: rawModel,
+        cost_per_1k_input: config.cost_per_1k_input,
+        cost_per_1k_output: config.cost_per_1k_output
       };
     }
   }
@@ -107,6 +125,38 @@ export function normalizeModelName(rawModel) {
     category: 'other',
     original: rawModel
   };
+}
+
+/**
+ * 计算使用成本
+ * @param {object} usage - 使用数据 {input_tokens, output_tokens, model}
+ * @returns {number} 成本（美元）
+ */
+export function calculateCost(usage) {
+  const modelInfo = normalizeModelName(usage.model);
+  
+  if (!modelInfo.cost_per_1k_input || !modelInfo.cost_per_1k_output) {
+    return 0; // 无法计算成本
+  }
+
+  const inputCost = (usage.input_tokens / 1000) * modelInfo.cost_per_1k_input;
+  const outputCost = (usage.output_tokens / 1000) * modelInfo.cost_per_1k_output;
+  
+  return inputCost + outputCost;
+}
+
+/**
+ * 获取所有支持的模型类别
+ * @returns {Array<string>} 模型类别列表
+ */
+export function getModelCategories() {
+  const categories = new Set();
+  MODEL_PATTERNS.forEach(pattern => {
+    if (pattern.category) {
+      categories.add(pattern.category);
+    }
+  });
+  return Array.from(categories).sort();
 }
 
 /**
