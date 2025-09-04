@@ -2,17 +2,85 @@ class Dashboard {
   constructor() {
     this.charts = {};
     this.data = {};
+    this.initAttempts = 0;  // 记录初始化尝试次数
+    this.startTime = Date.now();  // 记录开始时间
     this.init();
   }
 
   async init() {
+    console.log(`[Dashboard] Init attempt #${++this.initAttempts} at ${this.getElapsedTime()}ms`);
+    
+    // 检查 Chart.js 是否真正就绪
+    if (typeof Chart === 'undefined') {
+      console.error('[Dashboard] Chart.js not loaded, retrying in 100ms...');
+      setTimeout(() => this.init(), 100);
+      return;
+    }
+    
+    console.log('[Dashboard] Chart.js is available');
+    
     await this.checkStorageConfig();
     this.setupEventListeners();
-    this.initCharts();  // 先初始化图表
-    await this.loadData();  // 再加载数据
     
-    // 自动刷新每60秒
-    setInterval(() => this.loadData(), 60000);
+    // 尝试多种初始化策略
+    await this.initChartsWithRetry();
+    
+    // 加载数据
+    console.log(`[Dashboard] Loading data at ${this.getElapsedTime()}ms`);
+    await this.loadData();
+    
+    // 设置自动刷新
+    setInterval(() => {
+      console.log(`[Dashboard] Auto-refresh at ${this.getElapsedTime()}ms`);
+      this.loadData();
+    }, 60000);
+  }
+
+  async initChartsWithRetry() {
+    console.log(`[Dashboard] Attempting chart init at ${this.getElapsedTime()}ms`);
+    
+    const trendCanvas = document.getElementById('trend-chart');
+    const userCanvas = document.getElementById('user-chart');
+    
+    // 检查 Canvas 元素
+    if (!trendCanvas || !userCanvas) {
+      console.error('[Dashboard] Canvas elements not found, retrying...');
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return this.initChartsWithRetry();
+    }
+    
+    // 检查 Canvas 尺寸（0尺寸说明还没渲染）
+    const trendRect = trendCanvas.getBoundingClientRect();
+    const userRect = userCanvas.getBoundingClientRect();
+    
+    console.log('[Dashboard] Canvas dimensions:', {
+      trend: { width: trendRect.width, height: trendRect.height },
+      user: { width: userRect.width, height: userRect.height }
+    });
+    
+    if (trendRect.width === 0 || trendRect.height === 0) {
+      console.warn('[Dashboard] Canvas has zero dimensions, waiting for render...');
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      return this.initChartsWithRetry();
+    }
+    
+    // 初始化图表
+    try {
+      this.initCharts();
+      console.log(`[Dashboard] Charts initialized successfully at ${this.getElapsedTime()}ms`);
+      
+      // 验证图表对象
+      console.log('[Dashboard] Chart objects created:', {
+        trend: !!this.charts.trend,
+        user: !!this.charts.user,
+        trendReady: this.charts.trend?.canvas ? 'yes' : 'no',
+        userReady: this.charts.user?.canvas ? 'yes' : 'no'
+      });
+    } catch (error) {
+      console.error('[Dashboard] Chart initialization failed:', error);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return this.initChartsWithRetry();
+    }
   }
 
   async checkStorageConfig() {
@@ -138,7 +206,12 @@ class Dashboard {
 
   initCharts() {
     // 趋势图
-    const trendCtx = document.getElementById('trend-chart').getContext('2d');
+    const trendCanvas = document.getElementById('trend-chart');
+    if (!trendCanvas) {
+      throw new Error('trend-chart canvas not found!');
+    }
+    
+    const trendCtx = trendCanvas.getContext('2d');
     this.charts.trend = new Chart(trendCtx, {
       type: 'line',
       data: {
@@ -149,12 +222,20 @@ class Dashboard {
           borderColor: '#667eea',
           backgroundColor: 'rgba(102, 126, 234, 0.1)',
           tension: 0.3,
-          fill: true
+          fill: true,
+          pointRadius: 6,  // 增大点的大小
+          pointHoverRadius: 8,  // 鼠标悬停时点更大
+          pointBackgroundColor: '#667eea',  // 点的填充色
+          pointBorderColor: '#fff',  // 点的边框色
+          pointBorderWidth: 2  // 点的边框宽度
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: {
+          duration: 0  // 禁用动画，确保立即显示
+        },
         plugins: {
           legend: {
             display: false
@@ -172,7 +253,12 @@ class Dashboard {
     });
 
     // 用户分布图
-    const userCtx = document.getElementById('user-chart').getContext('2d');
+    const userCanvas = document.getElementById('user-chart');
+    if (!userCanvas) {
+      throw new Error('user-chart canvas not found!');
+    }
+    
+    const userCtx = userCanvas.getContext('2d');
     this.charts.user = new Chart(userCtx, {
       type: 'doughnut',
       data: {
@@ -192,6 +278,9 @@ class Dashboard {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: {
+          duration: 0  // 禁用动画
+        },
         plugins: {
           legend: {
             position: 'right',
@@ -208,35 +297,97 @@ class Dashboard {
   }
 
   updateCharts() {
+    const startUpdate = Date.now();
+    console.log(`[Dashboard] updateCharts called at ${this.getElapsedTime()}ms`);
+    
     const { trends, overview } = this.data;
+    
+    // 详细记录更新条件
+    const conditions = {
+      hasTrendChart: !!this.charts.trend,
+      hasTrendsData: !!trends?.trends,
+      trendsLength: trends?.trends?.length || 0,
+      hasUserChart: !!this.charts.user,
+      hasRankings: !!overview?.rankings,
+      rankingsLength: overview?.rankings?.length || 0
+    };
+    console.log('[Dashboard] Update conditions:', conditions);
     
     // 更新趋势图
     if (this.charts.trend && trends?.trends) {
-      const sortedTrends = [...trends.trends].reverse();
-      this.charts.trend.data.labels = sortedTrends.map(t => 
-        new Date(t.date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
-      );
-      this.charts.trend.data.datasets[0].data = sortedTrends.map(t => t.tokens);
-      this.charts.trend.update();
+      try {
+        const sortedTrends = [...trends.trends].reverse();
+        
+        // 记录数据更新前的状态
+        const beforeState = {
+          labelsCount: this.charts.trend.data.labels.length,
+          dataCount: this.charts.trend.data.datasets[0].data.length
+        };
+        
+        this.charts.trend.data.labels = sortedTrends.map(t => 
+          new Date(t.date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+        );
+        this.charts.trend.data.datasets[0].data = sortedTrends.map(t => t.tokens);
+        
+        // 记录数据更新后的状态
+        const afterState = {
+          labelsCount: this.charts.trend.data.labels.length,
+          dataCount: this.charts.trend.data.datasets[0].data.length,
+          firstLabel: this.charts.trend.data.labels[0],
+          lastLabel: this.charts.trend.data.labels[this.charts.trend.data.labels.length - 1],
+          firstData: this.charts.trend.data.datasets[0].data[0],
+          lastData: this.charts.trend.data.datasets[0].data[this.charts.trend.data.datasets[0].data.length - 1]
+        };
+        
+        console.log('[Dashboard] Trend data state:', { before: beforeState, after: afterState });
+        
+        // 强制立即更新，不使用动画
+        this.charts.trend.update('none');
+        
+        // 尝试强制渲染
+        if (this.charts.trend.render) {
+          this.charts.trend.render();
+        }
+        
+        console.log(`[Dashboard] Trend chart updated in ${Date.now() - startUpdate}ms`);
+      } catch (error) {
+        console.error('[Dashboard] Trend chart update error:', error);
+      }
+    } else {
+      console.warn('[Dashboard] Trend chart NOT updated - conditions not met');
     }
     
     // 更新用户分布图
     if (this.charts.user && overview?.rankings) {
-      const topUsers = overview.rankings.slice(0, 5);
-      const othersTotal = overview.rankings.slice(5).reduce((sum, u) => sum + u.total_usage, 0);
-      
-      this.charts.user.data.labels = [
-        ...topUsers.map(u => u.username),
-        othersTotal > 0 ? '其他' : null
-      ].filter(Boolean);
-      
-      this.charts.user.data.datasets[0].data = [
-        ...topUsers.map(u => u.total_usage),
-        othersTotal > 0 ? othersTotal : null
-      ].filter(v => v !== null);
-      
-      this.charts.user.update();
+      try {
+        const topUsers = overview.rankings.slice(0, 5);
+        const othersTotal = overview.rankings.slice(5).reduce((sum, u) => sum + u.total_usage, 0);
+        
+        this.charts.user.data.labels = [
+          ...topUsers.map(u => u.username),
+          othersTotal > 0 ? '其他' : null
+        ].filter(Boolean);
+        
+        this.charts.user.data.datasets[0].data = [
+          ...topUsers.map(u => u.total_usage),
+          othersTotal > 0 ? othersTotal : null
+        ].filter(v => v !== null);
+        
+        this.charts.user.update('none');
+        
+        if (this.charts.user.render) {
+          this.charts.user.render();
+        }
+        
+        console.log(`[Dashboard] User chart updated`);
+      } catch (error) {
+        console.error('[Dashboard] User chart update error:', error);
+      }
+    } else {
+      console.warn('[Dashboard] User chart NOT updated - conditions not met');
     }
+    
+    console.log(`[Dashboard] updateCharts completed at ${this.getElapsedTime()}ms, took ${Date.now() - startUpdate}ms`);
   }
 
   setupEventListeners() {
@@ -349,9 +500,36 @@ class Dashboard {
     // 可以实现一个 toast 通知
     console.error(message);
   }
+  
+  getElapsedTime() {
+    return Date.now() - this.startTime;
+  }
 }
 
-// 启动 Dashboard
+// 多重启动策略
+console.log('[Page] Script loaded');
+
+// 策略1：DOMContentLoaded 时启动
 document.addEventListener('DOMContentLoaded', () => {
-  new Dashboard();
+  console.log('[Page] DOMContentLoaded fired');
+  window.dashboard = new Dashboard();
 });
+
+// 策略2：window.onload 时检查
+window.addEventListener('load', () => {
+  console.log('[Page] window.onload fired');
+  
+  // 如果还没初始化成功，在这里再试一次
+  if (!window.dashboard || !window.dashboard.charts.trend) {
+    console.log('[Page] Reinitializing dashboard on window.load');
+    window.dashboard = new Dashboard();
+  }
+});
+
+// 策略3：延迟初始化保障
+setTimeout(() => {
+  if (!window.dashboard || !window.dashboard.charts.trend) {
+    console.log('[Page] Emergency dashboard init after 2 seconds');
+    window.dashboard = new Dashboard();
+  }
+}, 2000);
