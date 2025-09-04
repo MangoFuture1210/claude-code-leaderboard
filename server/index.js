@@ -25,7 +25,16 @@ app.use(express.json({ limit: '10mb' }));
 app.use(morgan('combined'));
 
 // 静态文件服务 (Dashboard)
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, path) => {
+    // 开发环境禁用缓存
+    if (process.env.NODE_ENV !== 'production') {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
 
 // API 路由
 app.use('/api/usage', usageRoutes);
