@@ -10,7 +10,7 @@ class Dashboard {
     await this.loadData();
     this.setupEventListeners();
     this.initCharts();
-    
+
     // 自动刷新每60秒
     setInterval(() => this.loadData(), 60000);
   }
@@ -19,7 +19,7 @@ class Dashboard {
     try {
       const response = await fetch('/api/stats/config');
       const config = await response.json();
-      
+
       if (!config.persistent_storage) {
         // 显示警告横幅
         const warningBanner = document.getElementById('storage-warning');
@@ -36,16 +36,16 @@ class Dashboard {
   async loadData() {
     const period = document.getElementById('period').value;
     const refreshBtn = document.getElementById('refresh-btn');
-    
+
     refreshBtn.classList.add('loading');
-    
+
     try {
       // 并行加载所有数据
       const [overview, trends] = await Promise.all([
         fetch(`/api/stats/overview?period=${period}`).then(r => r.json()),
         fetch('/api/stats/trends?days=30').then(r => r.json())
       ]);
-      
+
       this.data = { overview, trends };
       this.updateUI();
       this.updateLastUpdated();
@@ -59,19 +59,19 @@ class Dashboard {
 
   updateUI() {
     const { overview } = this.data;
-    
+
     // 更新统计卡片
     this.updateStatCard('total-tokens', overview.stats.totalTokens);
     this.updateStatCard('user-count', overview.stats.userCount);
     this.updateStatCard('session-count', overview.stats.sessionCount);
     this.updateStatCard('record-count', overview.stats.recordCount);
-    
+
     // 更新排行榜
     this.updateRankings(overview.rankings);
-    
+
     // 更新最近活动
     this.updateActivity(overview.recent);
-    
+
     // 更新图表
     this.updateCharts();
   }
@@ -85,17 +85,17 @@ class Dashboard {
 
   updateRankings(rankings) {
     const tbody = document.getElementById('rankings-tbody');
-    
+
     if (!rankings || rankings.length === 0) {
       tbody.innerHTML = '<tr><td colspan="6" class="loading">暂无数据</td></tr>';
       return;
     }
-    
+
     tbody.innerHTML = rankings.map((user, index) => {
       const rankBadge = this.getRankBadge(user.rank);
       const lastSeenText = this.formatTime(user.last_seen);
       const costText = this.formatCost(user.total_cost);
-      
+
       return `
         <tr>
           <td>${rankBadge}</td>
@@ -111,17 +111,17 @@ class Dashboard {
 
   updateActivity(records) {
     const tbody = document.getElementById('activity-tbody');
-    
+
     if (!records || records.length === 0) {
       tbody.innerHTML = '<tr><td colspan="7" class="loading">暂无活动</td></tr>';
       return;
     }
-    
+
     tbody.innerHTML = records.map(record => {
       const timeText = this.formatTime(record.timestamp);
       const modelName = this.formatModel(record.model);
       const costText = this.formatCost(record.cost);
-      
+
       return `
         <tr>
           <td>${timeText}</td>
@@ -209,32 +209,32 @@ class Dashboard {
 
   updateCharts() {
     const { trends, overview } = this.data;
-    
+
     // 更新趋势图
     if (this.charts.trend && trends?.trends) {
       const sortedTrends = [...trends.trends].reverse();
-      this.charts.trend.data.labels = sortedTrends.map(t => 
+      this.charts.trend.data.labels = sortedTrends.map(t =>
         new Date(t.date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
       );
       this.charts.trend.data.datasets[0].data = sortedTrends.map(t => t.tokens);
       this.charts.trend.update();
     }
-    
+
     // 更新用户分布图
     if (this.charts.user && overview?.rankings) {
       const topUsers = overview.rankings.slice(0, 5);
       const othersTotal = overview.rankings.slice(5).reduce((sum, u) => sum + u.total_usage, 0);
-      
+
       this.charts.user.data.labels = [
         ...topUsers.map(u => u.username),
         othersTotal > 0 ? '其他' : null
       ].filter(Boolean);
-      
+
       this.charts.user.data.datasets[0].data = [
         ...topUsers.map(u => u.total_usage),
         othersTotal > 0 ? othersTotal : null
       ].filter(v => v !== null);
-      
+
       this.charts.user.update();
     }
   }
@@ -243,7 +243,7 @@ class Dashboard {
     document.getElementById('refresh-btn').addEventListener('click', () => {
       this.loadData();
     });
-    
+
     document.getElementById('period').addEventListener('change', () => {
       this.loadData();
     });
@@ -268,7 +268,7 @@ class Dashboard {
 
   formatTime(timestamp) {
     if (!timestamp) return '-';
-    
+
     // 处理 SQLite 返回的 UTC 时间字符串
     // 如果时间戳不包含时区信息，添加 'Z' 表示 UTC
     let dateStr = timestamp;
@@ -276,11 +276,11 @@ class Dashboard {
       // 如果没有时区标识，假设是 UTC 时间
       dateStr = timestamp.replace(' ', 'T') + 'Z';
     }
-    
+
     const date = new Date(dateStr);
     const now = new Date();
     const diff = now - date;
-    
+
     if (diff < 60000) {
       return '刚刚';
     }
@@ -293,25 +293,30 @@ class Dashboard {
     if (diff < 604800000) {
       return `${Math.floor(diff / 86400000)} 天前`;
     }
-    
+
     return date.toLocaleDateString('zh-CN');
   }
 
-formatModel(model) {
+  formatModel(model) {
     if (!model) return 'Unknown';
-    
-    // 移除日期后缀，清理格式并转为友好显示
-    const cleaned = model
-        .replace(/-\d{8}$/, '')          // 移除日期后缀 (如 -20250514)
-        .replace(/-/g, ' ')              // 连字符替换为空格
-        .replace(/\b\w/g, l => l.toUpperCase()); // 首字母大写
-    
-    return cleaned || model;
-}
+
+    const parts = model.split('-');
+
+    // 去掉末尾的日期后缀（20xx开头的8位数字），其他的都保留
+    const cleanedParts = parts.filter(
+      (part, idx) =>
+        !(idx === parts.length - 1 && /^20\d{6}$/.test(part))
+    );
+
+    // 转成友好显示
+    return cleanedParts
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
 
   formatCost(cost) {
     if (cost === null || cost === undefined) return '$0.00';
-    
+
     if (cost < 0.01) {
       return `$${cost.toFixed(4)}`;
     } else if (cost < 1) {
