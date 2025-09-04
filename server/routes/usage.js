@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import db from '../db/database.js';
+import { normalizeModelName } from '../config/models.js';
 
 const router = Router();
 
@@ -52,6 +53,9 @@ router.post('/submit', async (req, res) => {
       // 确保 tokens 是对象
       const tokens = record.tokens || {};
       
+      // 标准化模型名称
+      const modelInfo = normalizeModelName(record.model);
+      
       dbRecords.push({
         username,
         timestamp: record.timestamp,
@@ -59,7 +63,7 @@ router.post('/submit', async (req, res) => {
         output_tokens: parseInt(tokens.output) || 0,
         cache_creation_tokens: parseInt(tokens.cache_creation) || 0,
         cache_read_tokens: parseInt(tokens.cache_read) || 0,
-        model: record.model || 'unknown',
+        model: modelInfo.name,  // 使用标准化的名称
         session_id: record.session_id || null,
         interaction_hash: record.interaction_hash || record.interaction_id || null
       });
