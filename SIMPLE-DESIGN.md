@@ -46,11 +46,11 @@ CREATE TABLE usage_records (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT NOT NULL,                    -- 用户名（直接识别）
   timestamp DATETIME NOT NULL,               -- 使用时间
-  input_tokens INTEGER NOT NULL,             -- 输入令牌
-  output_tokens INTEGER NOT NULL,            -- 输出令牌
-  cache_creation_tokens INTEGER DEFAULT 0,   -- 缓存创建令牌
-  cache_read_tokens INTEGER DEFAULT 0,       -- 缓存读取令牌
-  total_tokens INTEGER GENERATED ALWAYS AS   -- 总令牌（计算列）
+  input_tokens INTEGER NOT NULL,             -- 输入 token
+  output_tokens INTEGER NOT NULL,            -- 输出 token
+  cache_creation_tokens INTEGER DEFAULT 0,   -- 缓存创建 token
+  cache_read_tokens INTEGER DEFAULT 0,       -- 缓存读取 token
+  total_tokens INTEGER GENERATED ALWAYS AS   -- 总 token（计算列）
     (input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens) STORED,
   model TEXT,                                -- 模型名称
   session_id TEXT,                           -- 会话ID
@@ -698,7 +698,7 @@ program
       
       console.log(chalk.blue(`📊 ${config.username} 的使用统计`));
       console.log(chalk.gray('─'.repeat(40)));
-      console.log(`总令牌数: ${chalk.yellow(stats.total_tokens.toLocaleString())}`);
+      console.log(`总 token 数: ${chalk.yellow(stats.total_tokens.toLocaleString())}`);
       console.log(`会话次数: ${chalk.yellow(stats.session_count)}`);
       console.log(`首次使用: ${chalk.yellow(stats.first_use)}`);
       console.log(`最近使用: ${chalk.yellow(stats.last_use)}`);
@@ -779,7 +779,7 @@ program.parse();
     <!-- 统计卡片 -->
     <div class="stats-grid">
       <div class="stat-card">
-        <h3>总令牌数</h3>
+        <h3>总 token 数</h3>
         <p id="total-tokens">-</p>
       </div>
       <div class="stat-card">
@@ -804,7 +804,7 @@ program.parse();
           <tr>
             <th>排名</th>
             <th>用户名</th>
-            <th>总令牌数</th>
+            <th>总 token 数</th>
             <th>会话数</th>
             <th>最后活动</th>
           </tr>
@@ -932,7 +932,7 @@ class Dashboard {
       data: {
         labels: trends.map(t => t.date),
         datasets: [{
-          label: '每日令牌数',
+          label: '每日 token 数',
           data: trends.map(t => t.tokens),
           borderColor: 'rgb(75, 192, 192)',
           tension: 0.1

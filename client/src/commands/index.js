@@ -142,7 +142,7 @@ export async function statsCommand(options) {
     console.log(chalk.gray('─'.repeat(40)));
     console.log();
     
-    console.log(`${chalk.gray('总令牌数:')} ${chalk.yellow(formatNumber(stats.totalTokens))}`);
+    console.log(`${chalk.gray('总 token 数:')} ${chalk.yellow(formatNumber(stats.totalTokens))}`);
     console.log(`  ${chalk.gray('├─ 输入:')} ${formatNumber(stats.totalInput)}`);
     console.log(`  ${chalk.gray('└─ 输出:')} ${formatNumber(stats.totalOutput)}`);
     console.log();

@@ -81,7 +81,7 @@ claude-stats dashboard
 
 1. **Hook 安装**: 在 Claude Code 的 Stop Hook 中注册脚本
 2. **数据收集**: Claude Code 会话结束时自动触发 Hook
-3. **数据提取**: 从 `.jsonl` 文件中提取令牌使用信息
+3. **数据提取**: 从 `.jsonl` 文件中提取 token 使用信息
 4. **数据上传**: 将数据发送到配置的服务器
 5. **去重机制**: 基于交互哈希避免重复提交
 
@@ -105,7 +105,7 @@ Hook 脚本安装在 `~/.claude/claude_stats_hook.js`，在每次 Claude Code �
 ## 隐私说明
 
 ### 收集的数据
-- 令牌使用量（输入/输出/缓存）
+- token 使用量（输入/输出/缓存）
 - 使用时间戳
 - 模型名称
 - 会话 ID（用于统计）

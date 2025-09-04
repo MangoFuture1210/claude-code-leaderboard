@@ -15,8 +15,8 @@
 - **功能要点**:
   - 启动本地 Express 服务器监听端口 7632
   - 自动打开浏览器进行 Twitter 授权
-  - 处理授权回调并获取访问令牌
-  - 加密存储 OAuth 令牌到本地配置文件
+  - 处理授权回调并获取访问 token
+  - 加密存储 OAuth token 到本地配置文件
   - 支持重新认证功能
 
 #### 1.2 认证状态管理
@@ -24,7 +24,7 @@
 - **功能要点**:
   - 检查当前认证状态
   - 显示认证用户信息（Twitter handle, User ID）
-  - 令牌加密存储（AES-256-GCM）
+  - token 加密存储（AES-256-GCM）
   - 认证超时处理（5分钟）
 
 ### 2. 使用数据跟踪
@@ -38,14 +38,14 @@
   - Hook 版本自动更新机制
 
 #### 2.2 使用数据收集
-- **需求描述**: 收集 Claude Code 会话的令牌使用数据
+- **需求描述**: 收集 Claude Code 会话的 token 使用数据
 - **功能要点**:
   - 扫描 Claude 项目目录中的 `.jsonl` 文件
-  - 提取令牌使用统计信息：
-    - 输入令牌 (input_tokens)
-    - 输出令牌 (output_tokens)
-    - 缓存创建令牌 (cache_creation_input_tokens)
-    - 缓存读取令牌 (cache_read_input_tokens)
+  - 提取 token 使用统计信息：
+    - 输入 token (input_tokens)
+    - 输出 token (output_tokens)
+    - 缓存创建 token (cache_creation_input_tokens)
+    - 缓存读取 token (cache_read_input_tokens)
   - 生成交互哈希值用于去重
   - 记录模型类型和时间戳
 
@@ -85,7 +85,7 @@
 - **主要配置文件**:
   - `~/.claude/leaderboard.json`: 用户认证和 API 配置
   - `~/.claude/settings.json`: Claude Code Hook 设置
-  - `~/.claude/.encryption_key`: 令牌加密密钥
+  - `~/.claude/.encryption_key`: token 加密密钥
   - `~/.claude/leaderboard_submitted.json`: 已提交数据跟踪
 
 #### 4.2 配置迁移
@@ -164,7 +164,7 @@
 #### 9.1 数据收集范围
 - **需求描述**: 明确定义收集的数据范围
 - **收集内容**:
-  - 令牌使用统计
+  - token 使用统计
   - 时间戳
   - 模型名称
   - Twitter 用户信息
@@ -176,7 +176,7 @@
 #### 9.2 数据安全
 - **需求描述**: 确保用户数据安全
 - **安全措施**:
-  - OAuth 令牌本地加密存储
+  - OAuth token 本地加密存储
   - HTTPS 传输
   - 最小权限原则
   - 可完全删除所有数据
@@ -227,5 +227,5 @@
 
 ### 数据格式
 - 请求格式：JSON
-- 认证方式：OAuth 1.0a 令牌在请求头传递
+- 认证方式：OAuth 1.0a token 在请求头传递
 - 版本控制：X-CLI-Version 请求头

@@ -144,7 +144,7 @@ class Dashboard {
       data: {
         labels: [],
         datasets: [{
-          label: '每日令牌数',
+          label: '每日 token 数',
           data: [],
           borderColor: '#667eea',
           backgroundColor: 'rgba(102, 126, 234, 0.1)',
