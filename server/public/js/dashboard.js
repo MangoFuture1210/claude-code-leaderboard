@@ -45,6 +45,13 @@ class Dashboard {
       return;
     }
     
+    // 防止并发初始化
+    if (this.initializingCharts) {
+      console.log('[Dashboard] Chart initialization already in progress, skipping');
+      return;
+    }
+    this.initializingCharts = true;
+    
     const trendCanvas = document.getElementById('trend-chart');
     const userCanvas = document.getElementById('user-chart');
     
@@ -70,17 +77,23 @@ class Dashboard {
       return this.initChartsWithRetry();
     }
     
-    // 销毁已存在的图表实例
-    if (this.charts.trend) {
-      console.log('[Dashboard] Destroying existing trend chart');
-      this.charts.trend.destroy();
-      this.charts.trend = null;
+    // 检查是否有其他实例已经创建了图表
+    const existingTrendChart = Chart.getChart('trend-chart');
+    const existingUserChart = Chart.getChart('user-chart');
+    
+    if (existingTrendChart) {
+      console.log('[Dashboard] Found existing trend chart, destroying it');
+      existingTrendChart.destroy();
     }
-    if (this.charts.user) {
-      console.log('[Dashboard] Destroying existing user chart');
-      this.charts.user.destroy();
-      this.charts.user = null;
+    
+    if (existingUserChart) {
+      console.log('[Dashboard] Found existing user chart, destroying it');
+      existingUserChart.destroy();
     }
+    
+    // 清理本实例的引用
+    this.charts.trend = null;
+    this.charts.user = null;
     
     // 初始化图表
     try {
@@ -94,15 +107,28 @@ class Dashboard {
         trendReady: this.charts.trend?.canvas ? 'yes' : 'no',
         userReady: this.charts.user?.canvas ? 'yes' : 'no'
       });
+      
+      // 初始化成功，清除标志
+      this.initializingCharts = false;
     } catch (error) {
       console.error('[Dashboard] Chart initialization failed:', error);
+      this.initializingCharts = false;
       
-      // 如果是 Canvas 已被占用的错误，不要重试
+      // 如果是 Canvas 已被占用的错误，说明图表已经存在，不需要重试
       if (error.message && error.message.includes('Canvas is already in use')) {
-        console.error('[Dashboard] Canvas reuse error, stopping retry');
+        console.error('[Dashboard] Canvas already in use, charts likely already initialized');
+        // 标记为已初始化，防止后续重试
+        this.charts.trend = Chart.getChart('trend-chart');
+        this.charts.user = Chart.getChart('user-chart');
+        console.log('[Dashboard] Retrieved existing charts:', {
+          trend: !!this.charts.trend,
+          user: !!this.charts.user
+        });
         return;
       }
       
+      // 其他错误，重试
+      console.log('[Dashboard] Retrying chart initialization in 100ms...');
       await new Promise(resolve => setTimeout(resolve, 100));
       return this.initChartsWithRetry();
     }
@@ -531,37 +557,17 @@ class Dashboard {
   }
 }
 
-// 多重启动策略
+// 启动策略：使用 DOMContentLoaded 或 立即执行
 console.log('[Page] Script loaded');
 
-// 策略1：DOMContentLoaded 时启动
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('[Page] DOMContentLoaded fired');
+if (document.readyState === 'loading') {
+  // DOM 还在加载，等待 DOMContentLoaded
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('[Page] DOMContentLoaded fired');
+    window.dashboard = new Dashboard();
+  });
+} else {
+  // DOM 已经加载完成，立即执行
+  console.log('[Page] DOM already loaded, initializing immediately');
   window.dashboard = new Dashboard();
-});
-
-// 策略2：window.onload 时检查
-window.addEventListener('load', () => {
-  console.log('[Page] window.onload fired');
-  
-  // 只在没有 dashboard 实例时才创建
-  if (!window.dashboard) {
-    console.log('[Page] Creating dashboard on window.load');
-    window.dashboard = new Dashboard();
-  } else if (!window.dashboard.charts.trend) {
-    // 如果实例存在但图表没创建，尝试重新初始化图表
-    console.log('[Page] Dashboard exists but charts missing, retrying init');
-    window.dashboard.init();
-  }
-});
-
-// 策略3：延迟初始化保障
-setTimeout(() => {
-  if (!window.dashboard) {
-    console.log('[Page] Emergency dashboard creation after 2 seconds');
-    window.dashboard = new Dashboard();
-  } else if (!window.dashboard.charts.trend) {
-    console.log('[Page] Emergency chart init after 2 seconds');
-    window.dashboard.init();
-  }
-}, 2000);
+}
