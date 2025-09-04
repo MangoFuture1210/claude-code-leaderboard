@@ -299,25 +299,19 @@ class Dashboard {
 
   formatModel(model) {
     if (!model) return 'Unknown';
-    
-    const modelMap = {
-      'opus-4-1': 'Opus 4.1',
-      'claude-3-opus': 'Opus 3',
-      'claude-3-sonnet': 'Sonnet 3',
-      'claude-3-haiku': 'Haiku 3',
-      'claude-3-5-sonnet': 'Sonnet 3.5',
-      'claude-3.5-sonnet': 'Sonnet 3.5',
-      'claude-3-5-haiku': 'Haiku 3.5',
-      'claude-3.5-haiku': 'Haiku 3.5'
-    };
-    
-    for (const [key, value] of Object.entries(modelMap)) {
-      if (model.toLowerCase().includes(key)) {
-        return value;
-      }
-    }
-    
-    return model.split('-').pop() || model;
+
+    const parts = model.split('-');
+
+    // 去掉末尾的日期后缀（20xx开头的8位数字），其他的都保留
+    const cleanedParts = parts.filter(
+      (part, idx) =>
+        !(idx === parts.length - 1 && /^20\d{6}$/.test(part))
+    );
+
+    // 转成友好显示
+    return cleanedParts
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   }
 
   formatCost(cost) {
