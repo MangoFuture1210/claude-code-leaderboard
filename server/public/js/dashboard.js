@@ -300,37 +300,14 @@ class Dashboard {
   formatModel(model) {
     if (!model) return 'Unknown';
     
-    // 使用共享的模型格式化函数
-    if (typeof window.formatModelName === 'function') {
-      return window.formatModelName(model);
-    }
+    // 移除日期后缀，清理格式并转为友好显示
+    const cleaned = model
+        .replace(/-\d{8}$/, '')          // 移除日期后缀 (如 -20250514)
+        .replace(/^claude-/, '')         // 移除 claude- 前缀
+        .replace(/-/g, ' ')              // 连字符替换为空格
+        .replace(/\b\w/g, l => l.toUpperCase()); // 首字母大写
     
-    // Fallback: 使用内联模式匹配
-    const MODEL_PATTERNS = [
-      { pattern: /claude-sonnet-4-\d{8}/i, name: 'Claude 4 Sonnet' },
-      { pattern: /claude-opus-4-\d{8}/i, name: 'Claude 4 Opus' },
-      { pattern: /claude-haiku-4-\d{8}/i, name: 'Claude 4 Haiku' },
-      { pattern: /claude-3\.5-sonnet-\d{8}/i, name: 'Claude 3.5 Sonnet' },
-      { pattern: /claude-3\.5-haiku-\d{8}/i, name: 'Claude 3.5 Haiku' },
-      { pattern: /claude-3-opus-\d{8}/i, name: 'Claude 3 Opus' },
-      { pattern: /claude-3-sonnet-\d{8}/i, name: 'Claude 3 Sonnet' },
-      { pattern: /claude-3-haiku-\d{8}/i, name: 'Claude 3 Haiku' },
-      { pattern: /claude.*sonnet.*4/i, name: 'Claude 4 Sonnet' },
-      { pattern: /claude.*opus.*4/i, name: 'Claude 4 Opus' },
-      { pattern: /claude.*haiku.*4/i, name: 'Claude 4 Haiku' },
-      { pattern: /claude.*3\.5.*sonnet/i, name: 'Claude 3.5 Sonnet' },
-      { pattern: /claude.*3\.5.*haiku/i, name: 'Claude 3.5 Haiku' }
-    ];
-    
-    // 查找匹配的模式
-    for (const config of MODEL_PATTERNS) {
-      if (config.pattern.test(model)) {
-        return config.name;
-      }
-    }
-    
-    // 如果没有匹配的模式，返回原始名称
-    return model;
+    return cleaned || model;
   }
 
   formatCost(cost) {
