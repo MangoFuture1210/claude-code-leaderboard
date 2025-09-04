@@ -300,24 +300,37 @@ class Dashboard {
   formatModel(model) {
     if (!model) return 'Unknown';
     
-    const modelMap = {
-      'opus-4-1': 'Opus 4.1',
-      'claude-3-opus': 'Opus 3',
-      'claude-3-sonnet': 'Sonnet 3',
-      'claude-3-haiku': 'Haiku 3',
-      'claude-3-5-sonnet': 'Sonnet 3.5',
-      'claude-3.5-sonnet': 'Sonnet 3.5',
-      'claude-3-5-haiku': 'Haiku 3.5',
-      'claude-3.5-haiku': 'Haiku 3.5'
-    };
+    // 使用共享的模型格式化函数
+    if (typeof window.formatModelName === 'function') {
+      return window.formatModelName(model);
+    }
     
-    for (const [key, value] of Object.entries(modelMap)) {
-      if (model.toLowerCase().includes(key)) {
-        return value;
+    // Fallback: 使用内联模式匹配
+    const MODEL_PATTERNS = [
+      { pattern: /claude-sonnet-4-\d{8}/i, name: 'Claude 4 Sonnet' },
+      { pattern: /claude-opus-4-\d{8}/i, name: 'Claude 4 Opus' },
+      { pattern: /claude-haiku-4-\d{8}/i, name: 'Claude 4 Haiku' },
+      { pattern: /claude-3\.5-sonnet-\d{8}/i, name: 'Claude 3.5 Sonnet' },
+      { pattern: /claude-3\.5-haiku-\d{8}/i, name: 'Claude 3.5 Haiku' },
+      { pattern: /claude-3-opus-\d{8}/i, name: 'Claude 3 Opus' },
+      { pattern: /claude-3-sonnet-\d{8}/i, name: 'Claude 3 Sonnet' },
+      { pattern: /claude-3-haiku-\d{8}/i, name: 'Claude 3 Haiku' },
+      { pattern: /claude.*sonnet.*4/i, name: 'Claude 4 Sonnet' },
+      { pattern: /claude.*opus.*4/i, name: 'Claude 4 Opus' },
+      { pattern: /claude.*haiku.*4/i, name: 'Claude 4 Haiku' },
+      { pattern: /claude.*3\.5.*sonnet/i, name: 'Claude 3.5 Sonnet' },
+      { pattern: /claude.*3\.5.*haiku/i, name: 'Claude 3.5 Haiku' }
+    ];
+    
+    // 查找匹配的模式
+    for (const config of MODEL_PATTERNS) {
+      if (config.pattern.test(model)) {
+        return config.name;
       }
     }
     
-    return model.split('-').pop() || model;
+    // 如果没有匹配的模式，返回原始名称
+    return model;
   }
 
   formatCost(cost) {
