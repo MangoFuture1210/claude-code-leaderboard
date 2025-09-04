@@ -297,18 +297,17 @@ class Dashboard {
     return date.toLocaleDateString('zh-CN');
   }
 
-  formatModel(model) {
+formatModel(model) {
     if (!model) return 'Unknown';
     
     // 移除日期后缀，清理格式并转为友好显示
     const cleaned = model
         .replace(/-\d{8}$/, '')          // 移除日期后缀 (如 -20250514)
-        .replace(/^claude-/, '')         // 移除 claude- 前缀
         .replace(/-/g, ' ')              // 连字符替换为空格
         .replace(/\b\w/g, l => l.toUpperCase()); // 首字母大写
     
     return cleaned || model;
-  }
+}
 
   formatCost(cost) {
     if (cost === null || cost === undefined) return '$0.00';

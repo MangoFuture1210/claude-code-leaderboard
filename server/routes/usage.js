@@ -59,7 +59,7 @@ router.post('/submit', async (req, res) => {
         output_tokens: parseInt(tokens.output) || 0,
         cache_creation_tokens: parseInt(tokens.cache_creation) || 0,
         cache_read_tokens: parseInt(tokens.cache_read) || 0,
-        model: record.model || 'unknown',  // 使用原始模型名
+        model: record.model || 'unknown',
         session_id: record.session_id || null,
         interaction_hash: record.interaction_hash || record.interaction_id || null
       });
