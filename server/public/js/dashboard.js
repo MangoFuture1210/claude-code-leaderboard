@@ -7,9 +7,9 @@ class Dashboard {
 
   async init() {
     await this.checkStorageConfig();
-    await this.loadData();
     this.setupEventListeners();
-    this.initCharts();
+    this.initCharts();  // 先初始化图表
+    await this.loadData();  // 再加载数据
     
     // 自动刷新每60秒
     setInterval(() => this.loadData(), 60000);
