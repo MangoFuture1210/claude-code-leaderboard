@@ -27,17 +27,36 @@ router.get('/overview', async (req, res) => {
     const recent = await db.getRecentRecords(20);
     console.log('Recent records count:', recent?.length || 0);
 
-    // 计算排行榜中每个用户的成本（添加错误处理）
+    // 计算排行榜中每个用户的成本 - 按实际使用的模型计算
     const rankingsWithCost = await Promise.all(rankings.map(async user => {
       try {
-        const cost = await calculateCost({
-          input_tokens: user.total_input_tokens || 0,
-          output_tokens: user.total_output_tokens || 0,
-          cache_creation_tokens: user.total_cache_creation_tokens || 0,
-          cache_read_tokens: user.total_cache_read_tokens || 0,
-          model: user.primary_model || 'claude-3-5-sonnet-20241022'
-        });
-        return { ...user, total_cost: cost };
+        // 获取该用户的所有记录，按模型分组计算
+        const userRecords = await db.db.all(`
+          SELECT 
+            model,
+            SUM(input_tokens) as total_input_tokens,
+            SUM(output_tokens) as total_output_tokens,
+            SUM(cache_creation_tokens) as total_cache_creation_tokens,
+            SUM(cache_read_tokens) as total_cache_read_tokens
+          FROM usage_records 
+          WHERE username = ?
+          GROUP BY model
+        `, [user.username]);
+        
+        // 按模型分别计算成本，然后求和
+        let totalCost = 0;
+        for (const record of userRecords) {
+          const recordCost = await calculateCost({
+            input_tokens: record.total_input_tokens || 0,
+            output_tokens: record.total_output_tokens || 0,
+            cache_creation_tokens: record.total_cache_creation_tokens || 0,
+            cache_read_tokens: record.total_cache_read_tokens || 0,
+            model: record.model
+          });
+          totalCost += recordCost;
+        }
+        
+        return { ...user, total_cost: totalCost };
       } catch (error) {
         console.error('Error calculating cost for user:', user.username, error);
         return { ...user, total_cost: 0 };
@@ -188,6 +207,60 @@ router.get('/config', async (req, res) => {
     res.status(500).json({
       error: 'Failed to get configuration',
       message: error.message
+    });
+  }
+});
+
+// 获取按模型分组的统计数据
+router.get('/models', async (req, res) => {
+  try {
+    const modelStats = await db.db.all(`
+      SELECT 
+        model,
+        COUNT(*) as sessions,
+        SUM(input_tokens) as total_input_tokens,
+        SUM(output_tokens) as total_output_tokens,
+        SUM(cache_creation_tokens) as total_cache_write_tokens,
+        SUM(cache_read_tokens) as total_cache_read_tokens,
+        SUM(total_tokens) as total_all_tokens
+      FROM usage_records 
+      GROUP BY model
+      ORDER BY total_all_tokens DESC
+    `);
+    
+    // 计算每个模型的成本
+    const modelsWithCost = await Promise.all(modelStats.map(async stat => {
+      try {
+        const cost = await calculateCost({
+          input_tokens: stat.total_input_tokens || 0,
+          output_tokens: stat.total_output_tokens || 0,
+          cache_creation_tokens: stat.total_cache_write_tokens || 0,
+          cache_read_tokens: stat.total_cache_read_tokens || 0,
+          model: stat.model
+        });
+        return { ...stat, total_cost: cost };
+      } catch (error) {
+        console.error('Error calculating cost for model:', stat.model, error);
+        return { ...stat, total_cost: 0 };
+      }
+    }));
+    
+    // 计算总计
+    const totals = modelsWithCost.reduce((acc, model) => ({
+      total_sessions: acc.total_sessions + model.sessions,
+      total_tokens: acc.total_tokens + model.total_all_tokens,
+      total_cost: acc.total_cost + model.total_cost
+    }), { total_sessions: 0, total_tokens: 0, total_cost: 0 });
+    
+    res.json({
+      models: modelsWithCost,
+      totals,
+      generated: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Model stats error:', error);
+    res.status(500).json({ 
+      error: 'Failed to get model stats'
     });
   }
 });
