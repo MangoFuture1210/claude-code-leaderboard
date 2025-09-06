@@ -227,12 +227,14 @@ body.has-warning {
   max-height: 200px;
 }
 
+
 /* Activity Section */
 .activity-section {
   background: white;
   border-radius: 12px;
   padding: 20px;
   border: 1px solid #f0f0f0;
+  margin-top: 30px;
 }
 
 .activity-section h2 {

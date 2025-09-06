@@ -11,14 +11,38 @@ const DEFAULT_PRICES = {
   'claude-3-opus-20240229': {
     input: 15.00,
     output: 75.00,
-    cache_write: 18.75,  // 25% more than input
+    cache_write: 18.75,  // 25% more than input (5分钟缓存标准)
     cache_read: 1.50     // 10% of input price
   },
   'claude-opus-4-1-20250805': {
     input: 15.00,
     output: 75.00,
+    cache_write: 18.75,  // 使用官方5分钟缓存价格
+    cache_read: 1.50
+  },
+  'claude-opus-4-20250514': {
+    input: 15.00,
+    output: 75.00,
     cache_write: 18.75,
     cache_read: 1.50
+  },
+  'claude-sonnet-4-20250514': {
+    input: 3.00,
+    output: 15.00,
+    cache_write: 3.75,
+    cache_read: 0.30
+  },
+  'claude-3-7-sonnet-20250219': {
+    input: 3.00,
+    output: 15.00,
+    cache_write: 3.75,
+    cache_read: 0.30
+  },
+  'claude-3-7-sonnet-latest': {
+    input: 3.00,
+    output: 15.00,
+    cache_write: 3.75,
+    cache_read: 0.30
   },
   
   // Claude 3.5 Sonnet
@@ -122,10 +146,27 @@ async function getModelPricing(model) {
       return value;
     }
   }
+
+// Claude Opus 4.1			claude-opus-4-1-20250805
+// Claude Opus 4			claude-opus-4-20250514
+// Claude Sonnet 4			claude-sonnet-4-20250514
+// Claude Sonnet 3.7	 claude-3-7-sonnet-20250219(claude-3-7-sonnet-latest)
+// Claude Haiku 3.5	  claude-3-5-haiku-20241022(claude-3-5-haiku-latest)		
+// Claude Haiku 3			 claude-3-haiku-20240307
+
   
-  // 使用模式匹配
+  // 使用模式匹配 - 按照具体程度排序，更具体的放在前面
+  if (modelLower.includes('opus-4-1')) {
+    return prices['claude-opus-4-1-20250805'] || DEFAULT_PRICES['claude-opus-4-1-20250805'];
+  }
   if (modelLower.includes('opus-4')) {
-    return prices['claude-opus-4'] || DEFAULT_PRICES['claude-opus-4-1-20250805'];
+    return prices['claude-opus-4-20250514'] || DEFAULT_PRICES['claude-opus-4-20250514'];
+  }
+  if (modelLower.includes('sonnet-4') || (modelLower.includes('sonnet') && modelLower.includes('4'))) {
+    return prices['claude-sonnet-4-20250514'] || DEFAULT_PRICES['claude-sonnet-4-20250514'];
+  }
+  if (modelLower.includes('3-7-sonnet') || modelLower.includes('3.7-sonnet')) {
+    return prices['claude-3-7-sonnet-20250219'] || DEFAULT_PRICES['claude-3-7-sonnet-20250219'];
   }
   if (modelLower.includes('opus')) {
     return prices['claude-3-opus'] || DEFAULT_PRICES['claude-3-opus-20240229'];
@@ -159,9 +200,16 @@ async function getModelPricing(model) {
 async function calculateCost(usage) {
   const pricing = await getModelPricing(usage.model);
   
+  // Anthropic官方计费策略 - 标准价格，无自定义折扣
+  
+  // 输入/输出tokens - 标准价格
   const inputCost = (usage.input_tokens || 0) * pricing.input / 1000000;
   const outputCost = (usage.output_tokens || 0) * pricing.output / 1000000;
+  
+  // 缓存创建tokens - 使用官方cache_write价格
   const cacheWriteCost = (usage.cache_creation_tokens || 0) * pricing.cache_write / 1000000;
+  
+  // 缓存读取tokens - 使用官方cache_read价格
   const cacheReadCost = (usage.cache_read_tokens || 0) * pricing.cache_read / 1000000;
   
   return inputCost + outputCost + cacheWriteCost + cacheReadCost;
