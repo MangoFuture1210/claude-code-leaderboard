@@ -212,15 +212,15 @@ class Dashboard {
     }
     
     tbody.innerHTML = rankings.map((user, index) => {
-      const rankBadge = this.getRankBadge(user.rank);
-      const lastSeenText = this.formatTime(user.last_seen);
+      const rankBadge = this.getRankBadge(index + 1);  // 使用索引作为排名
+      const lastSeenText = this.formatTime(user.last_activity);  // 改为 last_activity
       const costText = this.formatCost(user.total_cost);
       
       return `
         <tr>
           <td>${rankBadge}</td>
           <td><strong>${this.escapeHtml(user.username)}</strong></td>
-          <td>${this.formatNumber(user.total_usage)}</td>
+          <td>${this.formatNumber(user.total_tokens)}</td>
           <td>${costText}</td>
           <td>${user.session_count}</td>
           <td>${lastSeenText}</td>
