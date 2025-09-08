@@ -9,14 +9,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CLAUDE_DIR = path.join(homedir(), '.claude');
 const HOOK_SCRIPT_PATH = path.join(CLAUDE_DIR, 'claude_stats_hook.js');
 const SETTINGS_JSON_PATH = path.join(CLAUDE_DIR, 'settings.json');
+const HOOK_VERSION_FILE = path.join(CLAUDE_DIR, 'stats-hook-version.json');
 
 // 安装 Hook
-export async function installHook(config) {
+export async function installHook(config, version = 'v2') {
   // 1. 复制 Hook 脚本
-  await installHookScript(config);
+  await installHookScript(config, version);
   
   // 2. 更新 settings.json
   await updateSettings();
+  
+  // 3. 记录版本信息
+  await saveHookVersion(version);
   
   return true;
 }
@@ -35,9 +39,10 @@ export async function uninstallHook() {
 }
 
 // 安装 Hook 脚本
-async function installHookScript(config) {
-  // 读取模板 Hook 脚本
-  const templatePath = path.join(__dirname, '..', '..', 'hooks', 'count_tokens.js');
+async function installHookScript(config, version = 'v2') {
+  // 默认使用 v2，仅为兼容性保留 v1
+  const hookFile = 'count_tokens_v2.js';
+  const templatePath = path.join(__dirname, '..', '..', 'hooks', hookFile);
   let hookContent = await readFile(templatePath, 'utf-8');
   
   // 注入配置
@@ -145,4 +150,65 @@ async function removeFromSettings() {
   } catch (error) {
     console.warn('Warning: Could not update settings.json');
   }
+}
+
+// 保存 Hook 版本信息
+async function saveHookVersion(version) {
+  const versionData = {
+    version,
+    installedAt: new Date().toISOString(),
+    features: version === 'v2' ? [
+      'state-management',
+      'batch-collection', 
+      'retry-logic',
+      'atomic-writes',
+      'file-locking'
+    ] : ['basic-collection']
+  };
+  
+  await writeFile(HOOK_VERSION_FILE, JSON.stringify(versionData, null, 2), 'utf-8');
+}
+
+// 获取当前 Hook 版本
+export async function getCurrentHookVersion() {
+  if (!existsSync(HOOK_VERSION_FILE)) {
+    // 如果版本文件不存在，检查是否有旧版 hook
+    if (existsSync(HOOK_SCRIPT_PATH)) {
+      return { version: 'v1', installedAt: 'unknown' };
+    }
+    return null;
+  }
+  
+  try {
+    const content = await readFile(HOOK_VERSION_FILE, 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
+// 清理状态文件（用于调试或重置）
+export async function cleanupStateFiles() {
+  const stateFiles = [
+    path.join(CLAUDE_DIR, 'stats-state.json'),
+    path.join(CLAUDE_DIR, 'stats-state.json.backup'),
+    path.join(CLAUDE_DIR, 'stats-state.buffer.json'),
+    path.join(CLAUDE_DIR, 'stats.lock'),
+    path.join(CLAUDE_DIR, 'stats-debug.log'),
+    path.join(CLAUDE_DIR, 'stats-debug.log.old')
+  ];
+  
+  let cleaned = 0;
+  for (const file of stateFiles) {
+    if (existsSync(file)) {
+      try {
+        await unlink(file);
+        cleaned++;
+      } catch {
+        // 忽略删除失败
+      }
+    }
+  }
+  
+  return cleaned;
 }

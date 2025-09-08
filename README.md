@@ -4,12 +4,14 @@
 
 ## 🎯 特性
 
-- 📊 自动跟踪 Claude Code 使用数据
+- 📊 **智能数据收集** - v2 Hook 确保 100% 准确的使用统计
 - 🚀 无需登录认证，通过用户名识别
 - 📈 美观的 Web Dashboard 实时展示
 - 💾 SQLite 数据库，易于部署
 - 🔧 一键安装配置
 - 🏢 支持团队自建服务器
+- 🔄 **状态管理** - 智能去重，防止数据丢失
+- 🛡️ **故障恢复** - 自动重试机制，确保数据完整性
 
 ## 🚀 快速开始
 
@@ -72,7 +74,7 @@ claude-stats dashboard
 
 | 命令 | 说明 |
 |------|------|
-| `claude-stats init` | 初始化配置并安装 Hook |
+| `claude-stats init` | 初始化配置并安装 v2 Hook |
 | `claude-stats stats` | 查看个人统计 |
 | `claude-stats stats -u <user>` | 查看指定用户统计 |
 | `claude-stats dashboard` | 打开 Web Dashboard |
@@ -80,6 +82,10 @@ claude-stats dashboard
 | `claude-stats config --show` | 显示配置 |
 | `claude-stats config --edit` | 编辑配置 |
 | `claude-stats reset` | 重置配置 |
+| `claude-stats hook-version` | 查看 Hook 版本信息 |
+| `claude-stats update-hook-to-v2` | 更新到 v2 Hook（老用户） |
+| `claude-stats cleanup` | 清理状态文件 |
+| `claude-stats debug` | 查看调试信息 |
 
 ### Web Dashboard 功能
 
@@ -217,13 +223,47 @@ docker run -p 3000:3000 -v ./data:/data claude-stats-server
 - **部署**: Render + Persistent Disk
 - **数据收集**: Claude Code Stop Hook
 
+## 🚀 v2 Hook 系统
+
+### 主要改进
+
+- **完整数据收集**: 不再只收集最新记录，而是收集所有未处理的使用数据
+- **智能状态管理**: 记录已处理的数据，避免重复统计
+- **自动重试机制**: 网络失败时自动重试，确保数据不丢失
+- **原子写入**: 防止状态文件损坏
+- **文件锁机制**: 防止并发冲突
+
+### 升级指南
+
+**新用户**: 直接运行 `claude-stats init`，会自动安装 v2
+
+**现有用户**: 
+1. 更新代码: `git pull`
+2. 升级 Hook: `claude-stats update-hook-to-v2`
+
+### 调试功能
+
+```bash
+# 查看 Hook 版本
+claude-stats hook-version
+
+# 开启调试模式
+CLAUDE_STATS_DEBUG=true claude-stats debug --logs
+
+# 清理状态文件（如遇问题）
+claude-stats cleanup
+```
+
 ## ❓ 常见问题
 
 ### Q: 如何确认 Hook 是否安装成功？
-A: 检查 `~/.claude/settings.json` 文件中是否有 `claude_stats_hook.js` 的配置。
+A: 运行 `claude-stats hook-version` 查看版本信息，或检查 `~/.claude/settings.json`。
+
+### Q: v2 Hook 有什么优势？
+A: v2 确保数据完整性，解决了 v1 只收集最新记录导致的统计偏低问题。
 
 ### Q: 数据多久同步一次？
-A: 每次 Claude Code 会话结束时自动同步。
+A: 每次 Claude Code 会话结束时自动同步所有未处理的数据。
 
 ### Q: 如何修改用户名或服务器地址？
 A: 运行 `claude-stats config --edit` 修改配置。
@@ -233,6 +273,19 @@ A: 可能是数据库初始化问题，稍等片刻让服务器重启，或检�
 
 ### Q: 没有服务器地址怎么办？
 A: 必须先部署服务器或从团队管理员获取服务器地址，客户端无法在没有服务器的情况下工作。
+
+### Q: 如何排查数据收集问题？
+A: 
+```bash
+# 开启调试模式查看详细日志
+CLAUDE_STATS_DEBUG=true claude-stats debug --logs
+
+# 检查状态文件
+claude-stats debug
+
+# 如有问题，清理状态重新开始
+claude-stats cleanup
+```
 
 ## 🔒 隐私说明
 
@@ -245,6 +298,19 @@ A: 必须先部署服务器或从团队管理员获取服务器地址，客户�
 
 欢迎提交 Issue 和 Pull Request！
 
+### 版本历史
+
+- **v2.0** (Latest) - 智能 Hook 系统
+  - ✅ 完整数据收集，解决统计偏低问题
+  - ✅ 状态管理和智能去重
+  - ✅ 自动重试和故障恢复
+  - ✅ 调试工具和监控功能
+
+- **v1.0** - 基础版本
+  - ❌ 只收集最新记录，存在数据丢失
+  - ❌ 无状态管理
+  - ❌ 无重试机制
+
 ### 潜在改进方向
 
 - **功能增强**
@@ -254,9 +320,9 @@ A: 必须先部署服务器或从团队管理员获取服务器地址，客户�
   - 数据管理功能（清理、归档）
   
 - **性能优化**
-  - 批量数据提交优化
   - Dashboard 缓存机制
   - 数据库查询优化
+  - 大规模部署支持
   
 - **部署支持**
   - 更多云平台部署指南（Vercel、Railway等）

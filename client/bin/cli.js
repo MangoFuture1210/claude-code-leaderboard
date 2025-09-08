@@ -8,7 +8,11 @@ import {
   dashboardCommand, 
   toggleCommand,
   configCommand,
-  resetCommand 
+  resetCommand,
+  hookVersionCommand,
+  updateHookToV2Command,
+  cleanupCommand,
+  debugCommand
 } from '../src/commands/index.js';
 
 const program = new Command();
@@ -57,6 +61,32 @@ program
   .description('Reset configuration and remove hook')
   .option('-f, --force', 'Skip confirmation')
   .action(resetCommand);
+
+// Hook 版本信息
+program
+  .command('hook-version')
+  .description('Show installed hook version information')
+  .action(hookVersionCommand);
+
+// 更新 Hook 到 v2
+program
+  .command('update-hook-to-v2')
+  .description('Update hook to v2 with advanced features')
+  .action(updateHookToV2Command);
+
+// 清理状态文件
+program
+  .command('cleanup')
+  .description('Clean up state files and reset collection progress')
+  .option('-f, --force', 'Skip confirmation')
+  .action(cleanupCommand);
+
+// 调试信息
+program
+  .command('debug')
+  .description('Show debug information and state files status')
+  .option('-l, --logs', 'Show recent log entries')
+  .action(debugCommand);
 
 // 默认命令 - 显示帮助或状态
 program

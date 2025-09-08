@@ -3,10 +3,10 @@ import inquirer from 'inquirer';
 import open from 'open';
 import path from 'path';
 import { homedir } from 'os';
-import { readFile, writeFile, unlink, mkdir } from 'fs/promises';
+import { readFile, writeFile, unlink, mkdir, stat } from 'fs/promises';
 import { existsSync } from 'fs';
 import { loadConfig, saveConfig, CONFIG_PATH } from '../utils/config.js';
-import { installHook, uninstallHook } from '../utils/hook-manager.js';
+import { installHook, uninstallHook, getCurrentHookVersion, cleanupStateFiles } from '../utils/hook-manager.js';
 
 // 初始化配置
 export async function initCommand() {
@@ -84,13 +84,14 @@ export async function initCommand() {
   
   await saveConfig(config);
   
-  // 安装 Hook
+  // 安装 Hook (直接使用 v2)
   console.log();
-  console.log(chalk.gray('正在安装 Hook...'));
+  console.log(chalk.gray('正在安装 Hook v2...'));
   
   try {
-    await installHook(config);
-    console.log(chalk.green('✓ Hook 安装成功'));
+    await installHook(config, 'v2');
+    console.log(chalk.green('✓ Hook v2 安装成功'));
+    console.log(chalk.gray('  包含: 状态管理、批量收集、重试逻辑'));
   } catch (error) {
     console.error(chalk.red('✗ Hook 安装失败:'), error.message);
     console.log(chalk.yellow('您可以稍后手动重试'));
@@ -332,4 +333,176 @@ function formatDate(dateStr) {
   if (!dateStr) return '-';
   const date = new Date(dateStr);
   return date.toLocaleString('zh-CN');
+}
+
+// Hook 版本信息
+export async function hookVersionCommand() {
+  const version = await getCurrentHookVersion();
+  
+  if (!version) {
+    console.log(chalk.yellow('⚠️  未安装 Hook'));
+    console.log(chalk.gray('请先运行 `claude-stats init` 进行配置'));
+    return;
+  }
+  
+  console.log(chalk.blue('📦 Hook 版本信息'));
+  console.log(chalk.gray('─'.repeat(40)));
+  console.log(`${chalk.gray('版本:')} ${chalk.cyan(version.version)}`);
+  console.log(`${chalk.gray('安装时间:')} ${formatDate(version.installedAt)}`);
+  
+  if (version.features) {
+    console.log(`${chalk.gray('功能:')}`);
+    version.features.forEach(f => {
+      console.log(`  - ${f}`);
+    });
+  }
+}
+
+// 更新 Hook 到 v2
+export async function updateHookToV2Command() {
+  const config = await loadConfig();
+  
+  if (!config) {
+    console.log(chalk.red('❌ 未找到配置'));
+    console.log(chalk.gray('请先运行 `claude-stats init` 进行配置'));
+    return;
+  }
+  
+  const currentVersion = await getCurrentHookVersion();
+  
+  if (currentVersion?.version === 'v2') {
+    console.log(chalk.yellow('⚠️  已经是 v2 版本'));
+    return;
+  }
+  
+  console.log(chalk.blue('🔧 更新 Hook 到 v2'));
+  console.log();
+  console.log(chalk.gray('v2 版本特性:'));
+  console.log('  - 状态管理：记录已处理的数据，避免重复');
+  console.log('  - 批量收集：一次性收集所有未处理记录');
+  console.log('  - 重试逻辑：发送失败自动重试');
+  console.log('  - 原子写入：防止状态文件损坏');
+  console.log('  - 文件锁：防止并发冲突');
+  console.log();
+  
+  const { confirm } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'confirm',
+      message: '确定要更新到 v2 吗？',
+      default: true
+    }
+  ]);
+  
+  if (!confirm) {
+    console.log(chalk.gray('更新已取消'));
+    return;
+  }
+  
+  try {
+    console.log(chalk.gray('正在更新...'));
+    await installHook(config, 'v2');
+    console.log(chalk.green('✓ 成功更新到 v2'));
+  } catch (error) {
+    console.error(chalk.red('✗ 更新失败:'), error.message);
+  }
+}
+
+// 清理状态文件
+export async function cleanupCommand(options) {
+  if (!options.force) {
+    const { confirm } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'confirm',
+        message: '确定要清理所有状态文件吗？这将重置收集进度',
+        default: false
+      }
+    ]);
+    
+    if (!confirm) {
+      console.log(chalk.gray('清理已取消'));
+      return;
+    }
+  }
+  
+  console.log(chalk.gray('正在清理状态文件...'));
+  const cleaned = await cleanupStateFiles();
+  console.log(chalk.green(`✓ 清理了 ${cleaned} 个文件`));
+}
+
+// 调试模式
+export async function debugCommand(options) {
+  const config = await loadConfig();
+  
+  if (!config) {
+    console.log(chalk.red('❌ 未找到配置'));
+    return;
+  }
+  
+  const STATE_FILE = path.join(homedir(), '.claude', 'stats-state.json');
+  const BUFFER_FILE = path.join(homedir(), '.claude', 'stats-state.buffer.json');
+  const LOG_FILE = path.join(homedir(), '.claude', 'stats-debug.log');
+  
+  console.log(chalk.blue('🔍 调试信息'));
+  console.log(chalk.gray('─'.repeat(40)));
+  
+  // 检查状态文件
+  if (existsSync(STATE_FILE)) {
+    try {
+      const state = JSON.parse(await readFile(STATE_FILE, 'utf-8'));
+      const hashCount = Object.values(state.recentHashes).flat().length;
+      console.log(`${chalk.gray('状态文件:')} ${chalk.green('存在')}`);
+      console.log(`  ${chalk.gray('已处理记录:')} ${hashCount}`);
+      console.log(`  ${chalk.gray('最后清理:')} ${formatDate(state.lastCleanup)}`);
+    } catch {
+      console.log(`${chalk.gray('状态文件:')} ${chalk.red('损坏')}`);
+    }
+  } else {
+    console.log(`${chalk.gray('状态文件:')} ${chalk.yellow('不存在')}`);
+  }
+  
+  // 检查缓冲文件
+  if (existsSync(BUFFER_FILE)) {
+    try {
+      const buffer = JSON.parse(await readFile(BUFFER_FILE, 'utf-8'));
+      console.log(`${chalk.gray('缓冲文件:')} ${chalk.green('存在')}`);
+      console.log(`  ${chalk.gray('待发送:')} ${buffer.pendingEntries?.length || 0} 条`);
+      console.log(`  ${chalk.gray('重试次数:')} ${buffer.retryCount || 0}`);
+    } catch {
+      console.log(`${chalk.gray('缓冲文件:')} ${chalk.red('损坏')}`);
+    }
+  } else {
+    console.log(`${chalk.gray('缓冲文件:')} ${chalk.gray('不存在')}`);
+  }
+  
+  // 检查日志文件
+  if (existsSync(LOG_FILE)) {
+    const stat = await stat(LOG_FILE);
+    console.log(`${chalk.gray('日志文件:')} ${chalk.green('存在')}`);
+    console.log(`  ${chalk.gray('大小:')} ${(stat.size / 1024).toFixed(2)} KB`);
+    
+    if (options.logs) {
+      console.log();
+      console.log(chalk.gray('最近日志:'));
+      const logs = await readFile(LOG_FILE, 'utf-8');
+      const lines = logs.trim().split('\n').slice(-10);
+      lines.forEach(line => {
+        try {
+          const log = JSON.parse(line);
+          const level = log.level === 'error' ? chalk.red(log.level) :
+                       log.level === 'warn' ? chalk.yellow(log.level) :
+                       chalk.gray(log.level);
+          console.log(`  [${level}] ${log.message}`);
+        } catch {
+          console.log(`  ${line}`);
+        }
+      });
+    }
+  } else {
+    console.log(`${chalk.gray('日志文件:')} ${chalk.gray('不存在')}`);
+  }
+  
+  console.log();
+  console.log(chalk.gray('提示: 设置 CLAUDE_STATS_DEBUG=true 环境变量启用日志'));
 }
