@@ -248,6 +248,32 @@ export class Database {
     return await this.db.get(sql);
   }
 
+  // 获取时间过滤器
+  getPeriodFilter(period) {
+    const now = new Date();
+    let startTimestamp;
+    
+    switch (period) {
+      case '1d':
+        startTimestamp = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case '7d':
+        startTimestamp = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        startTimestamp = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case 'all':
+      default:
+        startTimestamp = new Date(0); // Unix epoch start
+        break;
+    }
+    
+    return {
+      startTimestamp: startTimestamp.toISOString()
+    };
+  }
+
   // 获取用户排行榜
   async getUserRankings(limit = 20, period = 'all') {
     let whereClause = '';
