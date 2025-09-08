@@ -13,7 +13,7 @@ const SETTINGS_JSON_PATH = path.join(CLAUDE_DIR, 'settings.json');
 const HOOK_VERSION_FILE = path.join(CLAUDE_DIR, 'stats-hook-version.json');
 
 // 安装 Hook
-export async function installHook(config, version = 'v2') {
+export async function installHook(config, version = 'v3') {
   // 1. 复制 Hook 脚本
   await installHookScript(config, version);
   
@@ -40,9 +40,20 @@ export async function uninstallHook() {
 }
 
 // 安装 Hook 脚本
-async function installHookScript(config, version = 'v2') {
-  // 默认使用 v2，仅为兼容性保留 v1
-  const hookFile = 'count_tokens_v2.js';
+async function installHookScript(config, version = 'v3') {
+  // 选择对应版本的 Hook 文件
+  let hookFile;
+  switch(version) {
+    case 'v3':
+      hookFile = 'count_tokens_v3.js';
+      break;
+    case 'v2':
+      hookFile = 'count_tokens_v2.js';
+      break;
+    default:
+      hookFile = 'count_tokens_v3.js'; // 默认使用 v3
+  }
+  
   const templatePath = path.join(__dirname, '..', '..', 'hooks', hookFile);
   let hookContent = await readFile(templatePath, 'utf-8');
   
@@ -158,7 +169,17 @@ async function saveHookVersion(version) {
   const versionData = {
     version,
     installedAt: new Date().toISOString(),
-    features: version === 'v2' ? [
+    features: version === 'v3' ? [
+      'state-management',
+      'batch-collection', 
+      'retry-logic',
+      'atomic-writes',
+      'file-locking',
+      'dynamic-chunk-size',
+      'timeout-protection',
+      'progress-reporting',
+      'optimized-throughput'
+    ] : version === 'v2' ? [
       'state-management',
       'batch-collection', 
       'retry-logic',

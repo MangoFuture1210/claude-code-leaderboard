@@ -30,7 +30,9 @@ const LOCK_FILE = path.join(USER_HOME_DIR, '.claude', 'stats.lock');
 const LOG_FILE = path.join(USER_HOME_DIR, '.claude', 'stats-debug.log');
 
 // 配置常量
-const CHUNK_SIZE = 100; // 每批发送的记录数
+const CHUNK_SIZE = 100; // 每批发送的记录数（正常模式）
+const LARGE_CHUNK_SIZE = 500; // 大缓冲区模式批次大小
+const HUGE_CHUNK_SIZE = 1000; // 超大缓冲区模式批次大小
 const MAX_RETRIES = 3; // 最大重试次数
 const LOCK_TIMEOUT = 5000; // 锁超时时间（毫秒）
 const LOCK_STALE_TIME = 10000; // 锁过期时间（毫秒）
@@ -41,7 +43,12 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024; // 单个 JSONL 文件最大大小（20M
 // 大文件处理配置 - 针对Bug导致的异常积压
 const MAX_BUFFER_SIZE = 2 * 1024 * 1024; // 缓冲文件最大大小（2MB，更早触发）
 const MAX_BUFFER_ENTRIES = 5000; // 缓冲文件最大记录数（5000条，更早触发）
+const HUGE_BUFFER_ENTRIES = 10000; // 超大缓冲区阈值
 const PROGRESSIVE_CHUNK_SIZE = 50; // 保留，但现在不使用渐进处理
+
+// 超时配置
+const BATCH_TIMEOUT = 30000; // 每批请求超时（30秒）
+const TOTAL_TIMEOUT = 300000; // 总处理超时（5分钟）
 
 // ============ 工具类 ============
 
@@ -336,22 +343,35 @@ async function processLargeBufferAggressively(config, logger) {
   }
 
   const entries = buffer.pendingEntries;
+  const totalEntries = entries.length;
   
-  await logger.log('info', 'Processing large buffer aggressively (one-time cleanup)', {
-    totalEntries: entries.length,
-    strategy: 'complete_processing'
+  // 根据数据量选择批次大小
+  let chunkSize = LARGE_CHUNK_SIZE; // 默认500条
+  if (totalEntries > HUGE_BUFFER_ENTRIES) {
+    chunkSize = HUGE_CHUNK_SIZE; // 超过10000条时使用1000条批次
+  }
+  
+  await logger.log('info', 'Processing large buffer aggressively (optimized)', {
+    totalEntries,
+    chunkSize,
+    estimatedBatches: Math.ceil(totalEntries / chunkSize),
+    strategy: 'adaptive_chunk_size'
   });
 
+  const startTime = Date.now();
+  
   try {
-    // 使用现有的sendBatchWithRetry函数一次性处理所有数据
-    // 它内部已经有分批逻辑（每批100条）和重试机制
-    const result = await sendBatchWithRetry(config, entries);
+    // 使用优化的批次大小发送数据
+    const result = await sendBatchWithRetryOptimized(config, entries, chunkSize, logger);
     
+    const duration = Date.now() - startTime;
     await logger.log('info', 'Large buffer processing completed', {
       success: result.success,
       totalSent: result.totalSent,
       totalEntries: result.totalEntries,
-      hasAnySent: result.hasAnySent
+      hasAnySent: result.hasAnySent,
+      duration: `${(duration / 1000).toFixed(1)}s`,
+      throughput: `${(result.totalSent / (duration / 1000)).toFixed(0)} records/s`
     });
 
     // 使用与正常流程相同的部分成功处理逻辑
@@ -587,14 +607,20 @@ async function sendToServer(config, usage) {
 }
 
 async function sendBatchWithRetry(config, entries, maxRetries = MAX_RETRIES) {
+  return sendBatchWithRetryOptimized(config, entries, CHUNK_SIZE, null, maxRetries);
+}
+
+// 优化的批量发送函数，支持自定义批次大小和进度报告
+async function sendBatchWithRetryOptimized(config, entries, chunkSize = CHUNK_SIZE, logger = null, maxRetries = MAX_RETRIES) {
   const chunks = [];
   const chunkIndexMapping = []; // 记录每个chunk对应的原始entries索引
+  const totalStartTime = Date.now();
   
   // 分批并记录索引映射
-  for (let i = 0; i < entries.length; i += CHUNK_SIZE) {
-    const chunk = entries.slice(i, i + CHUNK_SIZE);
+  for (let i = 0; i < entries.length; i += chunkSize) {
+    const chunk = entries.slice(i, i + chunkSize);
     chunks.push(chunk);
-    chunkIndexMapping.push({ startIndex: i, endIndex: Math.min(i + CHUNK_SIZE, entries.length) });
+    chunkIndexMapping.push({ startIndex: i, endIndex: Math.min(i + chunkSize, entries.length) });
   }
   
   const results = [];
