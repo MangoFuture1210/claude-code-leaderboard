@@ -5,7 +5,7 @@ import path from 'path';
 import { homedir } from 'os';
 import { readFile, writeFile, unlink, mkdir, stat } from 'fs/promises';
 import { existsSync } from 'fs';
-import { loadConfig, saveConfig, CONFIG_PATH } from '../utils/config.js';
+import { loadConfig, saveConfig, CONFIG_PATH, normalizeServerUrl } from '../utils/config.js';
 import { installHook, uninstallHook, getCurrentHookVersion, cleanupStateFiles } from '../utils/hook-manager.js';
 
 // 初始化配置
@@ -107,7 +107,7 @@ export async function initCommand() {
   console.log(`  状态: ${config.enabled ? chalk.green('启用') : chalk.yellow('禁用')}`);
   console.log();
   console.log(chalk.gray('现在 Claude Code 的使用数据将自动跟踪并上传'));
-  console.log(chalk.gray(`访问 ${chalk.cyan(config.serverUrl)} 查看 Dashboard`));
+  console.log(chalk.gray(`访问 ${chalk.cyan(normalizeServerUrl(config.serverUrl))} 查看 Dashboard`));
 }
 
 // 查看统计
@@ -125,7 +125,7 @@ export async function statsCommand(options) {
   try {
     console.log(chalk.gray('正在获取统计数据...'));
     
-    const response = await fetch(`${config.serverUrl}/api/stats/user/${username}`);
+    const response = await fetch(`${normalizeServerUrl(config.serverUrl)}/api/stats/user/${username}`);
     
     if (!response.ok) {
       if (response.status === 404) {
@@ -169,14 +169,15 @@ export async function dashboardCommand() {
     return;
   }
   
-  console.log(chalk.blue(`正在打开 Dashboard: ${config.serverUrl}`));
+  const dashboardUrl = normalizeServerUrl(config.serverUrl);
+  console.log(chalk.blue(`正在打开 Dashboard: ${dashboardUrl}`));
   
   try {
-    await open(config.serverUrl);
+    await open(dashboardUrl);
     console.log(chalk.green('✓ Dashboard 已在浏览器中打开'));
   } catch (error) {
     console.error(chalk.red('✗ 无法打开浏览器'));
-    console.log(chalk.gray(`请手动访问: ${chalk.cyan(config.serverUrl)}`));
+    console.log(chalk.gray(`请手动访问: ${chalk.cyan(dashboardUrl)}`));
   }
 }
 
@@ -359,7 +360,7 @@ export async function hookVersionCommand() {
 }
 
 // 更新 Hook 到 v2
-export async function updateHookToV2Command() {
+export async function updateHookToV2Command(options = {}) {
   const config = await loadConfig();
   
   if (!config) {
@@ -370,9 +371,14 @@ export async function updateHookToV2Command() {
   
   const currentVersion = await getCurrentHookVersion();
   
-  if (currentVersion?.version === 'v2') {
+  if (currentVersion?.version === 'v2' && !options.force) {
     console.log(chalk.yellow('⚠️  已经是 v2 版本'));
+    console.log(chalk.gray('使用 --force 强制更新到最新版'));
     return;
+  }
+  
+  if (options.force && currentVersion?.version === 'v2') {
+    console.log(chalk.blue('🔄 强制更新 v2 到最新版'));
   }
   
   console.log(chalk.blue('🔧 更新 Hook 到 v2'));

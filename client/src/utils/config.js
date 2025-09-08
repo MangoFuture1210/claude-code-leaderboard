@@ -7,6 +7,14 @@ import { homedir } from 'os';
 export const CONFIG_DIR = path.join(homedir(), '.claude');
 export const CONFIG_PATH = path.join(CONFIG_DIR, 'stats-config.json');
 
+// 标准化服务器URL，确保末尾没有斜杠
+export function normalizeServerUrl(url) {
+  if (!url || typeof url !== 'string') {
+    return url;
+  }
+  return url.replace(/\/+$/, '');
+}
+
 // 加载配置
 export async function loadConfig() {
   try {

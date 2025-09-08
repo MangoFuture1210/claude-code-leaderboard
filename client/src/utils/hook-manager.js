@@ -3,6 +3,7 @@ import { existsSync } from 'fs';
 import path from 'path';
 import { homedir } from 'os';
 import { fileURLToPath } from 'url';
+import { normalizeServerUrl } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -50,7 +51,7 @@ async function installHookScript(config, version = 'v2') {
 // 自动生成的配置
 const STATS_CONFIG = ${JSON.stringify({
     username: config.username,
-    serverUrl: config.serverUrl,
+    serverUrl: normalizeServerUrl(config.serverUrl),
     enabled: config.enabled
   }, null, 2)};
 `;

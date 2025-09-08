@@ -14,6 +14,7 @@ import {
   cleanupCommand,
   debugCommand
 } from '../src/commands/index.js';
+import { normalizeServerUrl } from '../src/utils/config.js';
 
 const program = new Command();
 
@@ -72,6 +73,7 @@ program
 program
   .command('update-hook-to-v2')
   .description('Update hook to v2 with advanced features')
+  .option('-f, --force', 'Force update even if already on v2')
   .action(updateHookToV2Command);
 
 // 清理状态文件
@@ -101,7 +103,7 @@ program
       console.log(chalk.blue('📊 Claude Stats'));
       console.log(chalk.gray('─'.repeat(40)));
       console.log(`用户名: ${chalk.cyan(config.username)}`);
-      console.log(`服务器: ${chalk.cyan(config.serverUrl)}`);
+      console.log(`服务器: ${chalk.cyan(normalizeServerUrl(config.serverUrl))}`);
       console.log(`状态: ${config.enabled ? chalk.green('✓ 启用') : chalk.red('✗ 禁用')}`);
       console.log();
       console.log(chalk.gray('运行 `claude-stats --help` 查看所有命令'));
