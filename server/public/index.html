@@ -17,15 +17,12 @@
     <header>
       <h1>Claude Code 使用统计</h1>
       <div class="controls">
-        <select id="period">
-          <option value="1d">今天</option>
-          <option value="7d" selected>最近7天</option>
-          <option value="30d">最近30天</option>
-          <option value="all">全部</option>
-        </select>
-        <button id="refresh-btn">
-          <span class="refresh-icon">↻</span> 刷新
-        </button>
+        <div class="time-tabs">
+          <button class="time-tab" data-period="1d">今天</button>
+          <button class="time-tab active" data-period="7d">7天</button>
+          <button class="time-tab" data-period="30d">30天</button>
+          <button class="time-tab" data-period="all">全部</button>
+        </div>
         <span id="last-updated" class="last-updated"></span>
       </div>
     </header>

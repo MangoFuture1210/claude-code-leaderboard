@@ -153,10 +153,7 @@ class Dashboard {
   }
 
   async loadData() {
-    const period = document.getElementById('period').value;
-    const refreshBtn = document.getElementById('refresh-btn');
-    
-    refreshBtn.classList.add('loading');
+    const period = this.getCurrentPeriod();
     
     try {
       // 并行加载所有数据
@@ -167,13 +164,17 @@ class Dashboard {
       
       this.data = { overview, trends };
       this.updateUI();
+      this.updateCharts();
       this.updateLastUpdated();
     } catch (error) {
       console.error('Failed to load data:', error);
       this.showError('加载数据失败，请稍后重试');
-    } finally {
-      refreshBtn.classList.remove('loading');
     }
+  }
+
+  getCurrentPeriod() {
+    const activeTab = document.querySelector('.time-tab.active');
+    return activeTab ? activeTab.dataset.period : '7d';
   }
 
   updateUI() {
@@ -442,12 +443,16 @@ class Dashboard {
   }
 
   setupEventListeners() {
-    document.getElementById('refresh-btn').addEventListener('click', () => {
-      this.loadData();
-    });
-    
-    document.getElementById('period').addEventListener('change', () => {
-      this.loadData();
+    // 时间选择按钮事件
+    document.querySelectorAll('.time-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        // 移除所有active类
+        document.querySelectorAll('.time-tab').forEach(t => t.classList.remove('active'));
+        // 给当前点击的按钮添加active类
+        tab.classList.add('active');
+        // 加载数据
+        this.loadData();
+      });
     });
   }
 

@@ -21,10 +21,10 @@ router.get('/overview', async (req, res) => {
     const stats = await db.getStats(period);
     console.log('Stats result:', stats);
     
-    const rankings = await db.getUserRankings(10);
+    const rankings = await db.getUserRankings(10, period);
     console.log('Rankings count:', rankings?.length || 0);
     
-    const recent = await db.getRecentRecords(20);
+    const recent = await db.getRecentRecords(20, period);
     console.log('Recent records count:', recent?.length || 0);
 
     // 计算排行榜中每个用户的成本（添加错误处理）
@@ -79,8 +79,8 @@ router.get('/overview', async (req, res) => {
 // 获取用户排行榜
 router.get('/rankings', async (req, res) => {
   try {
-    const { limit = 50 } = req.query;
-    const rankings = await db.getUserRankings(parseInt(limit) || 50);
+    const { limit = 50, period = 'all' } = req.query;
+    const rankings = await db.getUserRankings(parseInt(limit) || 50, period);
     
     res.json({
       rankings,

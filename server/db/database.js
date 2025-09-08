@@ -249,41 +249,58 @@ export class Database {
   }
 
   // 获取用户排行榜
-  async getUserRankings(limit = 20) {
-    // 先使用简单查询获取基本数据
-    const basicSql = `
-      SELECT * FROM user_rankings
+  async getUserRankings(limit = 20, period = 'all') {
+    let whereClause = '';
+    let params = [];
+    
+    // 根据时间周期添加过滤条件
+    if (period !== 'all') {
+      const { startTimestamp } = this.getPeriodFilter(period);
+      whereClause = 'WHERE timestamp >= ?';
+      params = [startTimestamp];
+    }
+    
+    // 构建SQL查询
+    const sql = `
+      SELECT 
+        username,
+        COUNT(DISTINCT session_id) as session_count,
+        COUNT(*) as record_count,
+        MAX(timestamp) as last_activity,
+        COALESCE(SUM(input_tokens), 0) as total_input_tokens,
+        COALESCE(SUM(output_tokens), 0) as total_output_tokens,
+        COALESCE(SUM(cache_creation_tokens), 0) as total_cache_creation_tokens,
+        COALESCE(SUM(cache_read_tokens), 0) as total_cache_read_tokens,
+        (COALESCE(SUM(input_tokens), 0) + COALESCE(SUM(output_tokens), 0) + 
+         COALESCE(SUM(cache_creation_tokens), 0) + COALESCE(SUM(cache_read_tokens), 0)) as total_tokens
+      FROM usage_records
+      ${whereClause}
+      GROUP BY username
+      ORDER BY total_tokens DESC
       LIMIT ?
     `;
     
-    const rankings = await this.db.all(basicSql, [limit]);
+    params.push(limit);
+    const rankings = await this.db.all(sql, params);
     
-    // 为每个用户补充详细的 token 信息
+    // 为每个用户获取最常用的模型
     for (const user of rankings) {
-      const tokenSql = `
-        SELECT 
-          COALESCE(SUM(input_tokens), 0) as total_input_tokens,
-          COALESCE(SUM(output_tokens), 0) as total_output_tokens,
-          COALESCE(SUM(cache_creation_tokens), 0) as total_cache_creation_tokens,
-          COALESCE(SUM(cache_read_tokens), 0) as total_cache_read_tokens
-        FROM usage_records
-        WHERE username = ?
-      `;
-      
-      const tokenData = await this.db.get(tokenSql, [user.username]);
-      Object.assign(user, tokenData);
-      
-      // 获取最常用的模型
-      const modelSql = `
+      let modelSql = `
         SELECT model, COUNT(*) as count
         FROM usage_records
         WHERE username = ?
-        GROUP BY model
-        ORDER BY count DESC
-        LIMIT 1
       `;
+      let modelParams = [user.username];
       
-      const modelData = await this.db.get(modelSql, [user.username]);
+      if (period !== 'all') {
+        const { startTimestamp } = this.getPeriodFilter(period);
+        modelSql += ' AND timestamp >= ?';
+        modelParams.push(startTimestamp);
+      }
+      
+      modelSql += ' GROUP BY model ORDER BY count DESC LIMIT 1';
+      
+      const modelData = await this.db.get(modelSql, modelParams);
       user.primary_model = modelData?.model || null;
     }
     
@@ -291,7 +308,17 @@ export class Database {
   }
 
   // 获取最近记录
-  async getRecentRecords(limit = 100) {
+  async getRecentRecords(limit = 100, period = 'all') {
+    let whereClause = '';
+    let params = [];
+    
+    // 根据时间周期添加过滤条件
+    if (period !== 'all') {
+      const { startTimestamp } = this.getPeriodFilter(period);
+      whereClause = 'WHERE timestamp >= ?';
+      params = [startTimestamp];
+    }
+    
     const sql = `
       SELECT 
         username, timestamp, model,
@@ -299,11 +326,13 @@ export class Database {
         cache_creation_tokens, cache_read_tokens,
         total_tokens, session_id
       FROM usage_records
+      ${whereClause}
       ORDER BY timestamp DESC
       LIMIT ?
     `;
 
-    return await this.db.all(sql, [limit]);
+    params.push(limit);
+    return await this.db.all(sql, params);
   }
 
   // 获取用户统计

@@ -45,49 +45,35 @@ header h1 {
   gap: 15px;
 }
 
-#period {
-  padding: 8px 15px;
-  border-radius: 8px;
-  border: 2px solid #e0e0e0;
-  font-size: 14px;
-  cursor: pointer;
-  transition: border-color 0.3s;
+.time-tabs {
+  display: flex;
+  gap: 8px;
+  margin-right: auto;
 }
 
-#period:hover {
+.time-tab {
+  padding: 8px 16px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  color: #666;
+}
+
+.time-tab:hover:not(.active) {
+  background: #f8f9fa;
   border-color: #667eea;
 }
 
-#refresh-btn {
-  padding: 8px 15px;
+.time-tab.active {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  transition: transform 0.2s;
-}
-
-#refresh-btn:hover {
-  transform: translateY(-2px);
-}
-
-.refresh-icon {
-  display: inline-block;
-  animation: spin 2s linear infinite paused;
-}
-
-#refresh-btn.loading .refresh-icon {
-  animation-play-state: running;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  border-color: #667eea;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
 /* Warning Banner */
