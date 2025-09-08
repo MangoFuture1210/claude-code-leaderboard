@@ -154,6 +154,7 @@ class Dashboard {
 
   async loadData() {
     const period = this.getCurrentPeriod();
+    console.log('[Dashboard] Loading data with period:', period);
     
     try {
       // 并行加载所有数据
@@ -162,7 +163,11 @@ class Dashboard {
         fetch('/api/stats/trends?days=30').then(r => r.json())
       ]);
       
+      console.log('[Dashboard] API Response - Overview:', overview);
+      console.log('[Dashboard] API Response - Trends:', trends);
+      
       this.data = { overview, trends };
+      console.log('[Dashboard] Data stored, calling updateUI');
       this.updateUI();
       this.updateCharts();
       this.updateLastUpdated();
@@ -178,18 +183,35 @@ class Dashboard {
   }
 
   updateUI() {
+    console.log('[Dashboard] updateUI called with data:', this.data);
+    
+    if (!this.data || !this.data.overview) {
+      console.error('[Dashboard] No data available for updateUI');
+      return;
+    }
+    
     const { overview } = this.data;
+    console.log('[Dashboard] Overview data structure:', {
+      hasStats: !!overview.stats,
+      hasRankings: !!overview.rankings,
+      hasRecent: !!overview.recent,
+      statsKeys: overview.stats ? Object.keys(overview.stats) : [],
+      rankingsCount: overview.rankings ? overview.rankings.length : 0,
+      recentCount: overview.recent ? overview.recent.length : 0
+    });
     
     // 更新统计卡片
-    this.updateStatCard('total-tokens', overview.stats.totalTokens);
-    this.updateStatCard('user-count', overview.stats.userCount);
-    this.updateStatCard('session-count', overview.stats.sessionCount);
-    this.updateStatCard('record-count', overview.stats.recordCount);
+    this.updateStatCard('total-tokens', overview.stats?.totalTokens);
+    this.updateStatCard('user-count', overview.stats?.userCount);
+    this.updateStatCard('session-count', overview.stats?.sessionCount);
+    this.updateStatCard('record-count', overview.stats?.recordCount);
     
     // 更新排行榜
+    console.log('[Dashboard] Calling updateRankings with:', overview.rankings);
     this.updateRankings(overview.rankings);
     
     // 更新最近活动
+    console.log('[Dashboard] Calling updateActivity with:', overview.recent);
     this.updateActivity(overview.recent);
     
     // 更新图表
@@ -204,12 +226,21 @@ class Dashboard {
   }
 
   updateRankings(rankings) {
+    console.log('[Dashboard] updateRankings called with:', rankings);
     const tbody = document.getElementById('rankings-tbody');
     
+    if (!tbody) {
+      console.error('[Dashboard] rankings-tbody element not found!');
+      return;
+    }
+    
     if (!rankings || rankings.length === 0) {
+      console.log('[Dashboard] No rankings data, showing placeholder');
       tbody.innerHTML = '<tr><td colspan="6" class="loading">暂无数据</td></tr>';
       return;
     }
+    
+    console.log('[Dashboard] Processing', rankings.length, 'ranking items');
     
     tbody.innerHTML = rankings.map((user, index) => {
       const rankBadge = this.getRankBadge(index + 1);  // 使用索引作为排名
@@ -230,12 +261,21 @@ class Dashboard {
   }
 
   updateActivity(records) {
+    console.log('[Dashboard] updateActivity called with:', records);
     const tbody = document.getElementById('activity-tbody');
     
+    if (!tbody) {
+      console.error('[Dashboard] activity-tbody element not found!');
+      return;
+    }
+    
     if (!records || records.length === 0) {
+      console.log('[Dashboard] No activity records, showing placeholder');
       tbody.innerHTML = '<tr><td colspan="7" class="loading">暂无活动</td></tr>';
       return;
     }
+    
+    console.log('[Dashboard] Processing', records.length, 'activity records');
     
     tbody.innerHTML = records.map(record => {
       const timeText = this.formatTime(record.timestamp);

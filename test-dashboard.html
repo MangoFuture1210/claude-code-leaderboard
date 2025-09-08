@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Debug Test</title>
+</head>
+<body>
+  <h1>Dashboard API Test</h1>
+  <div id="output"></div>
+  
+  <script>
+    const output = document.getElementById('output');
+    
+    async function testAPIs() {
+      output.innerHTML = '<h2>Testing APIs...</h2>';
+      
+      try {
+        // Test overview API
+        const overviewResponse = await fetch('https://claude-code-leaderboard.violymuse.com/api/stats/overview?period=7d');
+        const overviewData = await overviewResponse.json();
+        
+        output.innerHTML += '<h3>Overview API Response:</h3>';
+        output.innerHTML += '<pre>' + JSON.stringify(overviewData, null, 2) + '</pre>';
+        
+        // Check data structure
+        if (overviewData.rankings && overviewData.rankings.length > 0) {
+          output.innerHTML += '<h3>First Ranking Item Structure:</h3>';
+          const firstUser = overviewData.rankings[0];
+          output.innerHTML += '<pre>' + JSON.stringify(Object.keys(firstUser), null, 2) + '</pre>';
+          
+          // Test the fields we're using
+          output.innerHTML += '<h3>Field Values Check:</h3>';
+          output.innerHTML += '<ul>';
+          output.innerHTML += '<li>username: ' + firstUser.username + '</li>';
+          output.innerHTML += '<li>total_tokens: ' + firstUser.total_tokens + '</li>';
+          output.innerHTML += '<li>last_activity: ' + firstUser.last_activity + '</li>';
+          output.innerHTML += '<li>session_count: ' + firstUser.session_count + '</li>';
+          output.innerHTML += '<li>total_cost: ' + firstUser.total_cost + '</li>';
+          output.innerHTML += '</ul>';
+        }
+        
+        // Test trends API  
+        const trendsResponse = await fetch('https://claude-code-leaderboard.violymuse.com/api/stats/trends?days=30');
+        const trendsData = await trendsResponse.json();
+        
+        output.innerHTML += '<h3>Trends API Response (first 3 items):</h3>';
+        output.innerHTML += '<pre>' + JSON.stringify(trendsData.slice(0, 3), null, 2) + '</pre>';
+        
+        output.innerHTML += '<h3 style="color: green;">✅ All APIs working correctly!</h3>';
+        
+      } catch (error) {
+        output.innerHTML += '<h3 style="color: red;">❌ Error: ' + error.message + '</h3>';
+      }
+    }
+    
+    testAPIs();
+  </script>
+</body>
+</html>
