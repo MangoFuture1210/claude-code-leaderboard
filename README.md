@@ -85,7 +85,6 @@ claude-stats dashboard
 | `claude-stats reset` | 重置配置 |
 | `claude-stats hook-version` | 查看 Hook 版本信息 |
 | `claude-stats upgrade-to-v3` | 升级到 v3 Hook（推荐） |
-| `claude-stats update-hook-to-v2` | 更新到 v2 Hook（已废弃） |
 | `claude-stats cleanup` | 清理状态文件 |
 | `claude-stats debug` | 查看调试信息 |
 
@@ -237,10 +236,10 @@ docker run -p 3000:3000 -v ./data:/data claude-stats-server
 - **更好的错误恢复**: 精确记录失败数据，支持断点续传
 
 #### 性能对比
-- **v2**: 处理 20,000 条数据可能卡死
+- **旧版**: 处理 20,000 条数据可能卡死
 - **v3**: 处理 20,000 条数据约需 45 秒（~450条/秒）
 
-### v2 Hook 特性
+### 核心特性
 - **完整数据收集**: 收集所有未处理的使用数据
 - **智能状态管理**: 记录已处理的数据，避免重复统计
 - **自动重试机制**: 网络失败时自动重试
@@ -274,9 +273,9 @@ claude-stats cleanup
 A: 运行 `claude-stats hook-version` 查看版本信息，或检查 `~/.claude/settings.json`。
 
 ### Q: v3 Hook 有什么优势？
-A: v3 在 v2 的基础上大幅提升性能，处理速度快 4-5 倍，支持超大数据量，不会卡死。
+A: v3 大幅提升性能，处理速度快 4-5 倍，支持超大数据量，不会卡死。
 
-### Q: 如何从 v2 升级到 v3？
+### Q: 如何升级到 v3？
 A: 运行 `claude-stats upgrade-to-v3` 即可一键升级。
 
 ### Q: 数据多久同步一次？
@@ -324,14 +323,7 @@ claude-stats cleanup
   - ✅ 性能提升 4-5 倍，支持 20,000+ 条数据
   - ✅ 包含 v2 所有功能
 
-- **v2.0** - 智能 Hook 系统
-  - ✅ 完整数据收集，解决统计偏低问题
-  - ✅ 状态管理和智能去重
-  - ✅ 自动重试和故障恢复
-  - ✅ 调试工具和监控功能
-  - ⚠️ 处理大量数据时可能卡死
-
-- **v1.0** - 基础版本
+- **v1.0 & v2.0** - 早期版本
   - ❌ 只收集最新记录，存在数据丢失
   - ❌ 无状态管理
   - ❌ 无重试机制
