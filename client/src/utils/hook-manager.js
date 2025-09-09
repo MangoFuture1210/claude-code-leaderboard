@@ -1,4 +1,4 @@
-import { readFile, writeFile, chmod, unlink } from 'fs/promises';
+import { readFile, writeFile, chmod, unlink, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { homedir } from 'os';
@@ -13,15 +13,20 @@ const SETTINGS_JSON_PATH = path.join(CLAUDE_DIR, 'settings.json');
 const HOOK_VERSION_FILE = path.join(CLAUDE_DIR, 'stats-hook-version.json');
 
 // 安装 Hook
-export async function installHook(config, version = 'v3') {
+export async function installHook(config, version = 'v3', options = {}) {
   // 1. 复制 Hook 脚本
-  await installHookScript(config, version);
+  await installHookScript(config, version, options);
   
-  // 2. 更新 settings.json
+  // 2. 安装共享模块（如果需要）
+  if (version === 'v3' || options.latest) {
+    await installSharedModules();
+  }
+  
+  // 3. 更新 settings.json
   await updateSettings();
   
-  // 3. 记录版本信息
-  await saveHookVersion(version);
+  // 4. 记录版本信息
+  await saveHookVersion(version, options.latest);
   
   return true;
 }
@@ -40,7 +45,7 @@ export async function uninstallHook() {
 }
 
 // 安装 Hook 脚本
-async function installHookScript(config, version = 'v3') {
+async function installHookScript(config, version = 'v3', options = {}) {
   // 选择对应版本的 Hook 文件
   let hookFile;
   switch(version) {
@@ -78,6 +83,27 @@ const STATS_CONFIG = ${JSON.stringify({
   
   // 设置可执行权限
   await chmod(HOOK_SCRIPT_PATH, 0o755);
+}
+
+// 安装共享模块
+async function installSharedModules() {
+  const sharedDir = path.join(CLAUDE_DIR, 'shared');
+  const sourceDir = path.join(__dirname, '..', '..', 'hooks', 'shared');
+  
+  // 创建 shared 目录
+  if (!existsSync(sharedDir)) {
+    await mkdir(sharedDir, { recursive: true });
+  }
+  
+  // 复制 data-collector.js
+  const collectorSource = path.join(sourceDir, 'data-collector.js');
+  const collectorDest = path.join(sharedDir, 'data-collector.js');
+  
+  if (existsSync(collectorSource)) {
+    const content = await readFile(collectorSource, 'utf-8');
+    await writeFile(collectorDest, content, 'utf-8');
+    await chmod(collectorDest, 0o755);
+  }
 }
 
 // 更新 settings.json
@@ -165,10 +191,11 @@ async function removeFromSettings() {
 }
 
 // 保存 Hook 版本信息
-async function saveHookVersion(version) {
+async function saveHookVersion(version, isLatest = false) {
   const versionData = {
     version,
     installedAt: new Date().toISOString(),
+    isLatest,
     features: version === 'v3' ? [
       'state-management',
       'batch-collection', 
@@ -178,7 +205,8 @@ async function saveHookVersion(version) {
       'dynamic-chunk-size',
       'timeout-protection',
       'progress-reporting',
-      'optimized-throughput'
+      'optimized-throughput',
+      ...(isLatest ? ['shared-modules', 'modular-architecture'] : [])
     ] : version === 'v2' ? [
       'state-management',
       'batch-collection', 

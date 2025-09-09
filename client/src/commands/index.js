@@ -416,6 +416,144 @@ export async function updateHookToV3Command(options = {}) {
   }
 }
 
+// 通用 Hook 升级命令
+export async function upgradeHookCommand(options = {}) {
+  const config = await loadConfig();
+  
+  if (!config) {
+    console.log(chalk.red('❌ 未找到配置'));
+    console.log(chalk.gray('请先运行 `claude-stats init` 进行配置'));
+    return;
+  }
+  
+  const currentVersion = await getCurrentHookVersion();
+  const targetVersion = options.target || 'v3';
+  const isLatest = options.latest || !options.target;
+  
+  console.log(chalk.blue(`🚀 Hook 升级工具`));
+  console.log(chalk.gray('─'.repeat(40)));
+  
+  // 显示当前状态
+  if (currentVersion) {
+    console.log(`${chalk.gray('当前版本:')} ${chalk.cyan(currentVersion.version)}`);
+    console.log(`${chalk.gray('安装时间:')} ${formatDate(currentVersion.installedAt)}`);
+  } else {
+    console.log(`${chalk.gray('当前版本:')} ${chalk.yellow('未安装')}`);
+  }
+  
+  console.log(`${chalk.gray('目标版本:')} ${chalk.cyan(targetVersion)}`);
+  console.log();
+  
+  // 版本检查
+  if (currentVersion?.version === targetVersion && !options.force && !isLatest) {
+    console.log(chalk.yellow(`⚠️  已经是 ${targetVersion} 版本`));
+    console.log(chalk.gray('使用 --force 强制更新或 --latest 更新到最新版本'));
+    return;
+  }
+  
+  // 显示版本特性
+  const versionFeatures = getVersionFeatures(targetVersion);
+  if (versionFeatures) {
+    console.log(chalk.gray(`${targetVersion} 版本特性:`));
+    versionFeatures.forEach(feature => console.log(`  - ${feature}`));
+    console.log();
+  }
+  
+  // 确认升级
+  const upgradeMessage = isLatest 
+    ? `确定要升级到最新版本 (${targetVersion}) 吗？`
+    : `确定要升级到 ${targetVersion} 吗？`;
+    
+  const { confirm } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'confirm',
+      message: upgradeMessage,
+      default: true
+    }
+  ]);
+  
+  if (!confirm) {
+    console.log(chalk.gray('升级已取消'));
+    return;
+  }
+  
+  try {
+    console.log(chalk.gray('正在备份当前配置...'));
+    await backupCurrentHook();
+    
+    console.log(chalk.gray(`正在升级到 ${targetVersion}...`));
+    await installHook(config, targetVersion, { 
+      force: options.force,
+      latest: isLatest 
+    });
+    
+    console.log(chalk.green(`✓ 成功升级到 ${targetVersion}`));
+    
+    if (isLatest) {
+      console.log(chalk.green('✓ 已更新到最新版本，包含所有共享模块'));
+    }
+    
+    console.log();
+    console.log(chalk.green('🎉 Hook 升级完成！'));
+    console.log(chalk.gray('新的 Hook 将在下次 Claude Code 会话结束时生效'));
+    
+  } catch (error) {
+    console.error(chalk.red('✗ 升级失败:'), error.message);
+    console.log(chalk.yellow('正在尝试恢复...'));
+    
+    try {
+      await restoreHookBackup();
+      console.log(chalk.green('✓ 已恢复到之前的版本'));
+    } catch (restoreError) {
+      console.error(chalk.red('✗ 恢复失败:'), restoreError.message);
+      console.log(chalk.gray('请手动运行 `claude-stats init` 重新安装'));
+    }
+  }
+}
+
+// 获取版本特性描述
+function getVersionFeatures(version) {
+  const features = {
+    'v2': [
+      '基础数据收集和上传',
+      '简单的错误处理',
+      '适合小量数据处理'
+    ],
+    'v3': [
+      '动态批次大小：根据数据量自动调整（100/500/1000条）',
+      '超时保护：防止处理大量数据时卡死',
+      '进度报告：实时显示处理进度',
+      '性能优化：处理速度提升 4-5 倍',
+      '更好的错误恢复：精确记录失败数据',
+      '共享模块架构：消除代码重复'
+    ]
+  };
+  
+  return features[version] || null;
+}
+
+// 备份当前 Hook
+async function backupCurrentHook() {
+  const hookPath = path.join(homedir(), '.claude', 'claude_stats_hook.js');
+  const backupPath = path.join(homedir(), '.claude', 'claude_stats_hook.js.backup');
+  
+  if (existsSync(hookPath)) {
+    await writeFile(backupPath, await readFile(hookPath));
+  }
+}
+
+// 恢复 Hook 备份
+async function restoreHookBackup() {
+  const hookPath = path.join(homedir(), '.claude', 'claude_stats_hook.js');
+  const backupPath = path.join(homedir(), '.claude', 'claude_stats_hook.js.backup');
+  
+  if (existsSync(backupPath)) {
+    await writeFile(hookPath, await readFile(backupPath));
+    await unlink(backupPath);
+  }
+}
+
 // 清理状态文件
 export async function cleanupCommand(options) {
   if (!options.force) {
