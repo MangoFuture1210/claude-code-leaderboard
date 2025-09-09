@@ -84,7 +84,8 @@ claude-stats dashboard
 | `claude-stats config --edit` | 编辑配置 |
 | `claude-stats reset` | 重置配置 |
 | `claude-stats hook-version` | 查看 Hook 版本信息 |
-| `claude-stats upgrade-to-v3` | 升级到 v3 Hook（推荐） |
+| `claude-stats upgrade-to-v3` | 升级到 v3 Hook（传统方式） |
+| `claude-stats upgrade-hook` | 通用 Hook 升级工具（推荐） |
 | `claude-stats cleanup` | 清理状态文件 |
 | `claude-stats debug` | 查看调试信息 |
 
@@ -234,10 +235,17 @@ docker run -p 3000:3000 -v ./data:/data claude-stats-server
 - **进度报告**: 实时显示处理进度和速度
 - **性能提升**: 处理速度提升 4-5 倍
 - **更好的错误恢复**: 精确记录失败数据，支持断点续传
+- **共享模块架构**: 消除代码重复，遵循 DRY 原则（d20a85d 更新）
 
 #### 性能对比
 - **旧版**: 处理 20,000 条数据可能卡死
 - **v3**: 处理 20,000 条数据约需 45 秒（~450条/秒）
+
+#### 共享模块架构
+最新版本（d20a85d 提交）引入了共享模块架构：
+- 独立的 `shared/data-collector.js` 模块
+- Hook v3 从 776 行减少到 636 行（-140 行）
+- 代码重复消除，维护性大幅提升
 
 ### 核心特性
 - **完整数据收集**: 收集所有未处理的使用数据
@@ -248,11 +256,63 @@ docker run -p 3000:3000 -v ./data:/data claude-stats-server
 
 ### 升级指南
 
-**新用户**: 直接运行 `claude-stats init`，会自动安装 v3
+#### 新用户
+直接运行 `claude-stats init`，会自动安装最新的 v3 Hook（包含共享模块）
 
-**现有用户**: 
-1. 更新代码: `git pull`
-2. 升级到 v3: `claude-stats upgrade-to-v3`
+#### 现有用户升级
+有两种升级方式：
+
+**方式一：通用升级工具（推荐）**
+```bash
+# 更新代码
+git pull
+
+# 使用新的通用升级命令
+claude-stats upgrade-hook --latest
+```
+
+**方式二：传统升级**
+```bash
+# 更新代码  
+git pull
+
+# 使用传统升级命令
+claude-stats upgrade-to-v3 --force
+```
+
+#### 升级场景说明
+
+| 当前版本 | 推荐命令 | 说明 |
+|---------|----------|------|
+| 未安装 | `claude-stats init` | 全新安装，自动使用最新版 |
+| v2 | `claude-stats upgrade-hook` | 升级到 v3 最新版 |
+| v3（旧版） | `claude-stats upgrade-hook --latest` | 更新到包含共享模块的最新版 |
+| v3（最新） | `claude-stats upgrade-hook --force` | 强制重新安装 |
+
+#### 升级特性
+
+**`claude-stats upgrade-hook` 新特性**:
+- ✅ 智能版本检测和升级路径选择
+- ✅ 自动安装共享模块（`~/.claude/shared/`）
+- ✅ 支持版本降级（`--target v2`）
+- ✅ 自动备份和故障恢复机制
+- ✅ 详细的升级进度和结果报告
+
+**升级选项**:
+```bash
+# 升级到默认最新版本
+claude-stats upgrade-hook
+
+# 升级到指定版本
+claude-stats upgrade-hook --target v2
+claude-stats upgrade-hook --target v3
+
+# 升级到最新版本（包含所有更新）
+claude-stats upgrade-hook --latest
+
+# 强制升级（即使版本相同）
+claude-stats upgrade-hook --force
+```
 
 ### 调试功能
 
@@ -275,8 +335,19 @@ A: 运行 `claude-stats hook-version` 查看版本信息，或检查 `~/.claude/
 ### Q: v3 Hook 有什么优势？
 A: v3 大幅提升性能，处理速度快 4-5 倍，支持超大数据量，不会卡死。
 
-### Q: 如何升级到 v3？
-A: 运行 `claude-stats upgrade-to-v3` 即可一键升级。
+### Q: 如何升级到最新的 v3？
+A: 推荐使用 `claude-stats upgrade-hook --latest` 升级到包含共享模块的最新版本。传统方式：`claude-stats upgrade-to-v3 --force`。
+
+### Q: upgrade-hook 和 upgrade-to-v3 有什么区别？
+A: `upgrade-hook` 是新的通用升级工具，支持：
+- 任意版本间的升级/降级
+- 智能检测当前版本和升级路径
+- 自动安装共享模块（d20a85d 更新）
+- 备份和故障恢复机制
+- 更详细的升级信息展示
+
+### Q: 我之前安装了 v3，需要重新升级吗？
+A: 如果是最近的版本可能缺少共享模块，建议运行 `claude-stats upgrade-hook --latest` 更新到最新架构。
 
 ### Q: 数据多久同步一次？
 A: 每次 Claude Code 会话结束时自动同步所有未处理的数据。
@@ -316,17 +387,32 @@ claude-stats cleanup
 
 ### 版本历史
 
-- **v3.0** (Latest) - 性能优化版本
+- **v3.0** (Latest) - 性能优化版本 + 共享模块架构
   - ✅ 动态批次大小，智能调整处理策略
   - ✅ 超时保护，防止大数据量卡死
   - ✅ 进度报告，实时显示处理状态
   - ✅ 性能提升 4-5 倍，支持 20,000+ 条数据
+  - ✅ **共享模块架构**（d20a85d 更新）: 代码重复消除，维护性提升
+  - ✅ **通用升级工具**: `claude-stats upgrade-hook` 支持智能升级
   - ✅ 包含 v2 所有功能
 
 - **v1.0 & v2.0** - 早期版本
   - ❌ 只收集最新记录，存在数据丢失
   - ❌ 无状态管理
   - ❌ 无重试机制
+
+#### 最新更新（d20a85d 提交）
+- **共享模块架构重构**
+  - 创建 `shared/data-collector.js` 独立模块
+  - Hook v3 代码从 776 行精简到 636 行（-18% 代码量）
+  - 消除函数重复，遵循 DRY 原则
+  - 提升代码维护性和可扩展性
+  
+- **增强升级工具**
+  - 新增 `claude-stats upgrade-hook` 通用升级命令
+  - 支持版本间任意升级/降级
+  - 自动处理共享模块依赖
+  - 完善的备份和恢复机制
 
 ### 潜在改进方向
 

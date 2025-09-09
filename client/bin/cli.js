@@ -11,6 +11,7 @@ import {
   resetCommand,
   hookVersionCommand,
   updateHookToV3Command,
+  upgradeHookCommand,
   cleanupCommand,
   debugCommand
 } from '../src/commands/index.js';
@@ -75,6 +76,15 @@ program
   .description('Upgrade hook to v3 with optimized performance')
   .option('-f, --force', 'Force upgrade even if already on v3')
   .action(updateHookToV3Command);
+
+// 通用 Hook 升级命令
+program
+  .command('upgrade-hook')
+  .description('Upgrade hook to specified version or latest')
+  .option('--target <version>', 'Target version to upgrade to (v2, v3)', 'v3')
+  .option('-f, --force', 'Force upgrade even if already on target version')
+  .option('-l, --latest', 'Upgrade to latest version including shared modules')
+  .action(upgradeHookCommand);
 
 // 清理状态文件
 program
