@@ -15,6 +15,7 @@ import { homedir } from 'node:os';
 import https from 'node:https';
 import http from 'node:http';
 import crypto from 'node:crypto';
+import { collectNewUsageData } from './shared/data-collector.js';
 
 // 获取用户主目录和 Claude 配置目录
 const USER_HOME_DIR = homedir();
@@ -512,6 +513,56 @@ async function processLargeBuffer(config, logger) {
   };
 }
 
+// ============ 状态管理功能 ============
+
+// 更新状态文件
+async function updateState(state, entries) {
+  if (entries.length === 0) return;
+  
+  // 按日期分组记录哈希
+  for (const entry of entries) {
+    const dayKey = entry.timestamp.split('T')[0];
+    
+    if (!state.recentHashes[dayKey]) {
+      state.recentHashes[dayKey] = [];
+    }
+    
+    state.recentHashes[dayKey].push(entry.interaction_hash);
+  }
+  
+  // 清理过期的哈希（保留30天）
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - RETENTION_DAYS);
+  const cutoffKey = cutoffDate.toISOString().split('T')[0];
+  
+  for (const dayKey in state.recentHashes) {
+    if (dayKey < cutoffKey) {
+      delete state.recentHashes[dayKey];
+    }
+  }
+  
+  state.lastCleanup = new Date().toISOString();
+  
+  // 保存状态文件
+  await atomicWriteJson(STATE_FILE, state);
+}
+
+// 收集新数据（使用共享模块）
+async function collectNewUsageDataWithState(logger) {
+  // 加载状态文件
+  const state = await loadStateWithValidation();
+  
+  // 使用共享的数据收集功能
+  const allEntries = await collectNewUsageData(state, logger);
+  
+  // 更新状态文件
+  if (allEntries.length > 0) {
+    await updateState(state, allEntries);
+  }
+  
+  return allEntries;
+}
+
 // ============ 主流程 ============
 
 async function main() {
@@ -547,9 +598,19 @@ async function main() {
       // 处理大缓冲区
       await processLargeBuffer(config, logger);
     } else {
-      // 正常流程（这里简化了，实际需要收集新数据）
+      // 正常流程：收集和发送新数据
       await logger.log('info', 'Normal processing mode');
-      // TODO: 实现正常的数据收集流程
+      const newEntries = await collectNewUsageDataWithState(logger);
+      if (newEntries.length > 0) {
+        const result = await sendBatchOptimized(config, newEntries, {
+          chunkSize: CHUNK_SIZES.NORMAL,
+          logger
+        });
+        
+        if (!result.success && result.failedEntries.length > 0) {
+          await saveToBuffer(result.failedEntries);
+        }
+      }
     }
     
     process.exit(0);
