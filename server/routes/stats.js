@@ -13,18 +13,21 @@ const router = Router();
 // 获取总体统计概览
 router.get('/overview', async (req, res) => {
   try {
-    const { period = '7d' } = req.query;
+    const { period = '7d', timezoneOffset = 0 } = req.query;
+    // 验证并限制时区偏移在合理范围内 (UTC-12 到 UTC+14)
+    let tzOffset = parseInt(timezoneOffset) || 0;
+    tzOffset = Math.max(-720, Math.min(840, tzOffset)); // -12小时到+14小时
     
-    console.log('Getting overview stats for period:', period);
+    console.log('Getting overview stats for period:', period, 'timezone offset:', tzOffset);
     
     // 获取统计数据
-    const stats = await db.getStats(period);
+    const stats = await db.getStats(period, tzOffset);
     console.log('Stats result:', stats);
     
-    const rankings = await db.getUserRankings(10, period);
+    const rankings = await db.getUserRankings(10, period, tzOffset);
     console.log('Rankings count:', rankings?.length || 0);
     
-    const recent = await db.getRecentRecords(20, period);
+    const recent = await db.getRecentRecords(20, period, tzOffset);
     console.log('Recent records count:', recent?.length || 0);
 
     // 计算排行榜中每个用户的成本（添加错误处理）
@@ -79,8 +82,11 @@ router.get('/overview', async (req, res) => {
 // 获取用户排行榜
 router.get('/rankings', async (req, res) => {
   try {
-    const { limit = 50, period = 'all' } = req.query;
-    const rankings = await db.getUserRankings(parseInt(limit) || 50, period);
+    const { limit = 50, period = 'all', timezoneOffset = 0 } = req.query;
+    // 验证并限制时区偏移
+    let tzOffset = parseInt(timezoneOffset) || 0;
+    tzOffset = Math.max(-720, Math.min(840, tzOffset));
+    const rankings = await db.getUserRankings(parseInt(limit) || 50, period, tzOffset);
     
     res.json({
       rankings,
@@ -139,8 +145,11 @@ router.get('/user/:username', async (req, res) => {
 // 获取趋势数据
 router.get('/trends', async (req, res) => {
   try {
-    const { days = 30 } = req.query;
-    const trends = await db.getTrends(parseInt(days) || 30);
+    const { days = 30, timezoneOffset = 0 } = req.query;
+    // 验证并限制时区偏移
+    let tzOffset = parseInt(timezoneOffset) || 0;
+    tzOffset = Math.max(-720, Math.min(840, tzOffset));
+    const trends = await db.getTrends(parseInt(days) || 30, tzOffset);
     
     res.json({
       trends: trends.map(item => ({

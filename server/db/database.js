@@ -225,13 +225,16 @@ export class Database {
   }
 
   // 获取总体统计
-  async getStats(period = '7d') {
-    const periodMap = {
-      '1d': '1 day',
-      '7d': '7 days',
-      '30d': '30 days',
-      'all': '100 years'
-    };
+  async getStats(period = '7d', timezoneOffset = 0) {
+    // 使用统一的时间过滤器
+    let whereClause = '';
+    let params = [];
+    
+    if (period !== 'all') {
+      const { startTimestamp } = this.getPeriodFilter(period, timezoneOffset);
+      whereClause = 'WHERE timestamp >= ?';
+      params = [startTimestamp];
+    }
 
     const sql = `
       SELECT 
@@ -242,26 +245,46 @@ export class Database {
         COALESCE(SUM(output_tokens), 0) as total_output,
         COUNT(DISTINCT session_id) as session_count
       FROM usage_records
-      WHERE timestamp > datetime('now', '-${periodMap[period] || '7 days'}')
+      ${whereClause}
     `;
 
-    return await this.db.get(sql);
+    return await this.db.get(sql, params);
   }
 
   // 获取时间过滤器
-  getPeriodFilter(period) {
+  getPeriodFilter(period, timezoneOffset = 0) {
     const now = new Date();
     let startTimestamp;
     
     switch (period) {
       case '1d':
-        startTimestamp = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        // "今天" - 基于用户时区的今天0点
+        // timezoneOffset 是分钟数，例如 UTC+8 是 -480 (表示 UTC 时间减去8小时得到本地时间)
+        // 获取用户本地时间的今天开始时刻
+        const todayStart = new Date(now);
+        // 设置为UTC的0点
+        todayStart.setUTCHours(0, 0, 0, 0);
+        // 调整时区偏移（减去偏移量得到对应的UTC时间）
+        // 例如：北京时间今天0点 = UTC昨天16点，所以要加上480分钟
+        startTimestamp = new Date(todayStart.getTime() + timezoneOffset * 60 * 1000);
         break;
       case '7d':
-        startTimestamp = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        // 过去7天 - 从7天前的本地0点开始（包含今天）
+        const sevenDaysAgo = new Date(now);
+        sevenDaysAgo.setUTCHours(0, 0, 0, 0);
+        // 减去6天（因为包含今天）
+        sevenDaysAgo.setTime(sevenDaysAgo.getTime() - 6 * 24 * 60 * 60 * 1000);
+        // 调整时区偏移
+        startTimestamp = new Date(sevenDaysAgo.getTime() + timezoneOffset * 60 * 1000);
         break;
       case '30d':
-        startTimestamp = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        // 过去30天 - 从30天前的本地0点开始（包含今天）
+        const thirtyDaysAgo = new Date(now);
+        thirtyDaysAgo.setUTCHours(0, 0, 0, 0);
+        // 减去29天（因为包含今天）
+        thirtyDaysAgo.setTime(thirtyDaysAgo.getTime() - 29 * 24 * 60 * 60 * 1000);
+        // 调整时区偏移
+        startTimestamp = new Date(thirtyDaysAgo.getTime() + timezoneOffset * 60 * 1000);
         break;
       case 'all':
       default:
@@ -275,13 +298,13 @@ export class Database {
   }
 
   // 获取用户排行榜
-  async getUserRankings(limit = 20, period = 'all') {
+  async getUserRankings(limit = 20, period = 'all', timezoneOffset = 0) {
     let whereClause = '';
     let params = [];
     
     // 根据时间周期添加过滤条件
     if (period !== 'all') {
-      const { startTimestamp } = this.getPeriodFilter(period);
+      const { startTimestamp } = this.getPeriodFilter(period, timezoneOffset);
       whereClause = 'WHERE timestamp >= ?';
       params = [startTimestamp];
     }
@@ -319,7 +342,7 @@ export class Database {
       let modelParams = [user.username];
       
       if (period !== 'all') {
-        const { startTimestamp } = this.getPeriodFilter(period);
+        const { startTimestamp } = this.getPeriodFilter(period, timezoneOffset);
         modelSql += ' AND timestamp >= ?';
         modelParams.push(startTimestamp);
       }
@@ -334,13 +357,13 @@ export class Database {
   }
 
   // 获取最近记录
-  async getRecentRecords(limit = 100, period = 'all') {
+  async getRecentRecords(limit = 100, period = 'all', timezoneOffset = 0) {
     let whereClause = '';
     let params = [];
     
     // 根据时间周期添加过滤条件
     if (period !== 'all') {
-      const { startTimestamp } = this.getPeriodFilter(period);
+      const { startTimestamp } = this.getPeriodFilter(period, timezoneOffset);
       whereClause = 'WHERE timestamp >= ?';
       params = [startTimestamp];
     }
@@ -382,7 +405,16 @@ export class Database {
   }
 
   // 获取趋势数据
-  async getTrends(days = 30) {
+  async getTrends(days = 30, timezoneOffset = 0) {
+    // 计算起始时间（基于用户时区）
+    const now = new Date();
+    const startDate = new Date(now);
+    startDate.setUTCHours(0, 0, 0, 0);
+    // 减去指定天数
+    startDate.setTime(startDate.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+    // 调整时区偏移
+    const startTimestamp = new Date(startDate.getTime() + timezoneOffset * 60 * 1000);
+    
     const sql = `
       SELECT 
         DATE(timestamp) as date,
@@ -390,12 +422,12 @@ export class Database {
         COALESCE(SUM(total_tokens), 0) as tokens,
         COUNT(*) as interactions
       FROM usage_records
-      WHERE timestamp > datetime('now', '-${days} days')
+      WHERE timestamp >= ?
       GROUP BY DATE(timestamp)
       ORDER BY date DESC
     `;
 
-    return await this.db.all(sql);
+    return await this.db.all(sql, [startTimestamp.toISOString()]);
   }
 
   // 更新日统计

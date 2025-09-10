@@ -154,13 +154,15 @@ class Dashboard {
 
   async loadData() {
     const period = this.getCurrentPeriod();
-    console.log('[Dashboard] Loading data with period:', period);
+    // 获取用户的时区偏移（分钟数）
+    const timezoneOffset = new Date().getTimezoneOffset();
+    console.log('[Dashboard] Loading data with period:', period, 'timezone offset:', timezoneOffset);
     
     try {
-      // 并行加载所有数据
+      // 并行加载所有数据，传递时区偏移
       const [overview, trends] = await Promise.all([
-        fetch(`/api/stats/overview?period=${period}`).then(r => r.json()),
-        fetch('/api/stats/trends?days=30').then(r => r.json())
+        fetch(`/api/stats/overview?period=${period}&timezoneOffset=${timezoneOffset}`).then(r => r.json()),
+        fetch(`/api/stats/trends?days=30&timezoneOffset=${timezoneOffset}`).then(r => r.json())
       ]);
       
       console.log('[Dashboard] API Response - Overview:', overview);
