@@ -13,7 +13,7 @@ const router = Router();
 // 获取总体统计概览
 router.get('/overview', async (req, res) => {
   try {
-    const { period = '7d', timezoneOffset = 0 } = req.query;
+    const { period = '1d', timezoneOffset = 0 } = req.query;
     // 验证并限制时区偏移在合理范围内 (UTC-12 到 UTC+14)
     let tzOffset = parseInt(timezoneOffset) || 0;
     tzOffset = Math.max(-720, Math.min(840, tzOffset)); // -12小时到+14小时

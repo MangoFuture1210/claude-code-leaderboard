@@ -181,7 +181,7 @@ class Dashboard {
 
   getCurrentPeriod() {
     const activeTab = document.querySelector('.time-tab.active');
-    return activeTab ? activeTab.dataset.period : '7d';
+    return activeTab ? activeTab.dataset.period : '1d';
   }
 
   updateUI() {
