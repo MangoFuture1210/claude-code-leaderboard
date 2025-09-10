@@ -49,12 +49,27 @@ router.post('/submit', async (req, res) => {
         continue; // 跳过无效记录
       }
 
+      // 验证和标准化时间戳
+      let normalizedTimestamp;
+      try {
+        const date = new Date(record.timestamp);
+        if (isNaN(date.getTime())) {
+          console.warn('Invalid timestamp:', record.timestamp);
+          continue; // 跳过无效时间戳
+        }
+        // 总是存储为 UTC ISO 字符串
+        normalizedTimestamp = date.toISOString();
+      } catch (error) {
+        console.warn('Error parsing timestamp:', record.timestamp, error);
+        continue;
+      }
+
       // 确保 tokens 是对象
       const tokens = record.tokens || {};
       
       dbRecords.push({
         username,
-        timestamp: record.timestamp,
+        timestamp: normalizedTimestamp,
         input_tokens: parseInt(tokens.input) || 0,
         output_tokens: parseInt(tokens.output) || 0,
         cache_creation_tokens: parseInt(tokens.cache_creation) || 0,

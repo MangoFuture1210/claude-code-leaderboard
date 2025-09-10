@@ -516,32 +516,60 @@ class Dashboard {
   formatTime(timestamp) {
     if (!timestamp) return '-';
     
-    // 处理 SQLite 返回的 UTC 时间字符串
-    // 如果时间戳不包含时区信息，添加 'Z' 表示 UTC
-    let dateStr = timestamp;
-    if (!timestamp.includes('Z') && !timestamp.includes('+') && !timestamp.includes('-')) {
-      // 如果没有时区标识，假设是 UTC 时间
-      dateStr = timestamp.replace(' ', 'T') + 'Z';
+    try {
+      // 处理 SQLite 返回的 UTC 时间字符串
+      let dateStr = timestamp;
+      
+      // 处理 SQLite 格式 "YYYY-MM-DD HH:MM:SS" -> ISO 格式
+      if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(timestamp)) {
+        dateStr = timestamp.replace(' ', 'T') + 'Z';
+      }
+      // 处理 ISO 格式但没有时区 "YYYY-MM-DD'T'HH:MM:SS"
+      else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(timestamp)) {
+        dateStr = timestamp + 'Z';
+      }
+      // 处理完整的 ISO 8601 格式（包含毫秒和/或时区）
+      // 支持格式：
+      // - 2025-01-10T12:30:45Z (UTC)
+      // - 2025-01-10T12:30:45.123Z (带毫秒)
+      // - 2025-01-10T12:30:45+08:00 (时区偏移)
+      // - 2025-01-10T12:30:45.123+05:30 (带毫秒和时区偏移)
+      else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})$/.test(timestamp)) {
+        dateStr = timestamp;
+      }
+      
+      const date = new Date(dateStr);
+      
+      // 验证日期解析是否成功
+      if (isNaN(date.getTime())) {
+        console.warn('[Dashboard] Invalid timestamp:', timestamp);
+        return '时间格式错误';
+      }
+      
+      const now = new Date();
+      const diff = now - date;
+      
+      // 相对时间显示
+      if (diff < 60000) {
+        return '刚刚';
+      }
+      if (diff < 3600000) {
+        return `${Math.floor(diff / 60000)} 分钟前`;
+      }
+      if (diff < 86400000) {
+        return `${Math.floor(diff / 3600000)} 小时前`;
+      }
+      if (diff < 604800000) {
+        return `${Math.floor(diff / 86400000)} 天前`;
+      }
+      
+      // 使用本地时区显示日期
+      return date.toLocaleDateString('zh-CN');
+      
+    } catch (error) {
+      console.error('[Dashboard] Error parsing timestamp:', timestamp, error);
+      return '解析错误';
     }
-    
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diff = now - date;
-    
-    if (diff < 60000) {
-      return '刚刚';
-    }
-    if (diff < 3600000) {
-      return `${Math.floor(diff / 60000)} 分钟前`;
-    }
-    if (diff < 86400000) {
-      return `${Math.floor(diff / 3600000)} 小时前`;
-    }
-    if (diff < 604800000) {
-      return `${Math.floor(diff / 86400000)} 天前`;
-    }
-    
-    return date.toLocaleDateString('zh-CN');
   }
 
   formatModel(model) {

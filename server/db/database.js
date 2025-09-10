@@ -286,13 +286,13 @@ export class Database {
       params = [startTimestamp];
     }
     
-    // 构建SQL查询
+    // 构建SQL查询 - 确保返回 UTC 格式的时间戳
     const sql = `
       SELECT 
         username,
         COUNT(DISTINCT session_id) as session_count,
         COUNT(*) as record_count,
-        MAX(timestamp) as last_activity,
+        strftime('%Y-%m-%dT%H:%M:%S.000Z', MAX(timestamp)) as last_activity,
         COALESCE(SUM(input_tokens), 0) as total_input_tokens,
         COALESCE(SUM(output_tokens), 0) as total_output_tokens,
         COALESCE(SUM(cache_creation_tokens), 0) as total_cache_creation_tokens,
@@ -371,8 +371,8 @@ export class Database {
         COALESCE(SUM(input_tokens), 0) as total_input,
         COALESCE(SUM(output_tokens), 0) as total_output,
         COUNT(DISTINCT session_id) as session_count,
-        MIN(timestamp) as first_use,
-        MAX(timestamp) as last_use
+        strftime('%Y-%m-%dT%H:%M:%S.000Z', MIN(timestamp)) as first_use,
+        strftime('%Y-%m-%dT%H:%M:%S.000Z', MAX(timestamp)) as last_use
       FROM usage_records
       WHERE username = ?
       GROUP BY username
