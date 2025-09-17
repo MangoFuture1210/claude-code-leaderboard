@@ -24,7 +24,7 @@ router.get('/overview', async (req, res) => {
     const stats = await db.getStats(period, tzOffset);
     console.log('Stats result:', stats);
     
-    const rankings = await db.getUserRankings(10, period, tzOffset);
+    const rankings = await db.getUserRankings(20, period, tzOffset);
     console.log('Rankings count:', rankings?.length || 0);
     
     const recent = await db.getRecentRecords(20, period, tzOffset);
