@@ -217,7 +217,10 @@ function sendRequest(config, entries, timeout = REQUEST_TIMEOUT) {
     port: url.port || (isHttps ? 443 : 80),
     path: `${basePath}/api/usage/submit`,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': 'claude-stats-hook/4.0'
+    },
     timeout
   };
 
