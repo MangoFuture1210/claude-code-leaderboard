@@ -20,11 +20,15 @@ import { collectNewUsageDataIncremental } from './shared/data-collector.js';
 // 获取用户主目录和 Claude 配置目录
 const USER_HOME_DIR = homedir();
 
+// CLAUDE_CONFIG_DIR-aware: matches data-collector.js project discovery
+const CONFIG_DIR = process.env.CLAUDE_CONFIG_DIR
+  || path.join(USER_HOME_DIR, '.claude');
+
 // 文件路径
-const STATE_FILE = path.join(USER_HOME_DIR, '.claude', 'stats-state.json');
-const BUFFER_FILE = path.join(USER_HOME_DIR, '.claude', 'stats-state.buffer.json');
-const LOCK_FILE = path.join(USER_HOME_DIR, '.claude', 'stats.lock');
-const LOG_FILE = path.join(USER_HOME_DIR, '.claude', 'stats-debug.log');
+const STATE_FILE = path.join(CONFIG_DIR, 'stats-state.json');
+const BUFFER_FILE = path.join(CONFIG_DIR, 'stats-state.buffer.json');
+const LOCK_FILE = path.join(CONFIG_DIR, 'stats.lock');
+const LOG_FILE = path.join(CONFIG_DIR, 'stats-debug.log');
 
 // V4 配置常量
 const THROTTLE_INTERVAL = 30_000;       // 30 秒节流
