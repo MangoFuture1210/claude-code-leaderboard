@@ -343,7 +343,7 @@ async function main() {
 
   try {
     // 读取配置
-    const configPath = path.join(USER_HOME_DIR, '.claude', 'stats-config.json');
+    const configPath = path.join(CONFIG_DIR, 'stats-config.json');
     if (!existsSync(configPath)) {
       return;
     }
