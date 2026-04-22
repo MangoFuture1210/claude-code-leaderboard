@@ -9,7 +9,7 @@
 // 5. 快速失败锁：1 秒锁超时（v3 为 5 秒）
 
 import { readFile, writeFile, rename, unlink, open, stat, appendFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { homedir } from 'node:os';
@@ -434,8 +434,8 @@ async function main() {
   }
 }
 
-// 如果作为独立脚本运行
-if (import.meta.url === `file://${process.argv[1]}`) {
+// 如果作为独立脚本运行 (realpathSync resolves symlinks so hook works via ~/.claude-mm/ symlink)
+if (import.meta.url === `file://${realpathSync(process.argv[1])}`) {
   main().catch(() => {}).finally(() => process.exit(0));
 }
 
