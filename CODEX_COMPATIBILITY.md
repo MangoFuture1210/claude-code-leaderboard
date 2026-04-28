@@ -58,6 +58,8 @@ The first version should:
 4. Convert `last_token_usage` into one usage record per event.
 5. Send records to the existing `/api/usage/submit` endpoint.
 
+Auto-sync can now use Codex's official Stop Hook mechanism. The client should install a user-level hook in `~/.codex/hooks.json` and enable `[features].codex_hooks = true` in `~/.codex/config.toml`.
+
 Suggested mapping:
 
 ```js
@@ -111,4 +113,4 @@ Useful follow-up improvements:
 3. Add CLI commands under a `codex` command group.
 4. Keep Claude hook installation untouched.
 5. Add fixture tests for parsing Codex token-count JSONL without storing conversation content.
-6. Optionally add a lightweight scheduled sync later, once manual sync is proven reliable.
+6. Add Codex Stop Hook install/status/uninstall commands for automatic sync after each Codex turn.

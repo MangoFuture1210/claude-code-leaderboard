@@ -14,7 +14,10 @@ import {
   upgradeHookCommand,
   cleanupCommand,
   debugCommand,
-  codexSyncCommand
+  codexSyncCommand,
+  codexHookInstallCommand,
+  codexHookStatusCommand,
+  codexHookUninstallCommand
 } from '../src/commands/index.js';
 import { normalizeServerUrl } from '../src/utils/config.js';
 
@@ -111,8 +114,30 @@ codex
   .description('Sync Codex token usage from local rollout metadata')
   .option('--sessions-dir <path>', 'Override Codex sessions directory')
   .option('--batch-size <number>', 'Records to submit per request', '100')
+  .option('--max-records <number>', 'Maximum records to submit in one run')
+  .option('--quiet', 'Suppress progress output for hook usage')
   .option('--dry-run', 'Parse and summarize without submitting data')
   .action(codexSyncCommand);
+
+const codexHook = codex
+  .command('hook')
+  .description('Install or manage Codex Stop Hook auto-sync');
+
+codexHook
+  .command('install')
+  .description('Install Codex Stop Hook auto-sync')
+  .action(codexHookInstallCommand);
+
+codexHook
+  .command('status')
+  .description('Show Codex Stop Hook auto-sync status')
+  .action(codexHookStatusCommand);
+
+codexHook
+  .command('uninstall')
+  .description('Remove Codex Stop Hook auto-sync')
+  .option('--disable-feature', 'Also set codex_hooks = false in Codex config')
+  .action(codexHookUninstallCommand);
 
 // 默认命令 - 显示帮助或状态
 program
