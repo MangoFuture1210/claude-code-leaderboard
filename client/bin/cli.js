@@ -13,7 +13,8 @@ import {
   updateHookToV3Command,
   upgradeHookCommand,
   cleanupCommand,
-  debugCommand
+  debugCommand,
+  codexSyncCommand
 } from '../src/commands/index.js';
 import { normalizeServerUrl } from '../src/utils/config.js';
 
@@ -100,6 +101,19 @@ program
   .option('-l, --logs', 'Show recent log entries')
   .action(debugCommand);
 
+// Codex 兼容命令
+const codex = program
+  .command('codex')
+  .description('Codex compatibility commands');
+
+codex
+  .command('sync')
+  .description('Sync Codex token usage from local rollout metadata')
+  .option('--sessions-dir <path>', 'Override Codex sessions directory')
+  .option('--batch-size <number>', 'Records to submit per request', '100')
+  .option('--dry-run', 'Parse and summarize without submitting data')
+  .action(codexSyncCommand);
+
 // 默认命令 - 显示帮助或状态
 program
   .action(async () => {
@@ -132,8 +146,8 @@ async function main() {
       console.error(chalk.red('错误:'), error.message);
       process.exit(1);
     }
-    // 其他错误直接退出，不显示错误信息
-    process.exit(0);
+    console.error(chalk.red('错误:'), error.message);
+    process.exit(1);
   }
 }
 

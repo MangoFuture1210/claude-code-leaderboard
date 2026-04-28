@@ -7,6 +7,7 @@ import { readFile, writeFile, unlink, mkdir, stat } from 'fs/promises';
 import { existsSync } from 'fs';
 import { loadConfig, saveConfig, CONFIG_PATH, normalizeServerUrl } from '../utils/config.js';
 import { installHook, uninstallHook, getCurrentHookVersion, cleanupStateFiles } from '../utils/hook-manager.js';
+import { collectCodexUsageData, getCodexSessionsDir } from '../../hooks/shared/codex-collector.js';
 
 // 初始化配置
 export async function initCommand() {
@@ -334,6 +335,154 @@ function formatDate(dateStr) {
   if (!dateStr) return '-';
   const date = new Date(dateStr);
   return date.toLocaleString('zh-CN');
+}
+
+async function sendUsageBatch(config, entries) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+
+  let response;
+  try {
+    response = await fetch(`${normalizeServerUrl(config.serverUrl)}/api/usage/submit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'claude-stats-codex-sync/1.0'
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        username: config.username,
+        usage: entries
+      })
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  return await response.json();
+}
+
+async function loadCodexState(statePath) {
+  try {
+    if (!existsSync(statePath)) {
+      return {
+        version: '1.0.0',
+        recentHashes: {},
+        lastSyncAt: null
+      };
+    }
+
+    const content = await readFile(statePath, 'utf-8');
+    const state = JSON.parse(content);
+    return {
+      version: '1.0.0',
+      recentHashes: state.recentHashes || {},
+      lastSyncAt: state.lastSyncAt || null
+    };
+  } catch {
+    return {
+      version: '1.0.0',
+      recentHashes: {},
+      lastSyncAt: null
+    };
+  }
+}
+
+async function saveCodexState(statePath, state) {
+  await writeFile(statePath, JSON.stringify(state, null, 2), 'utf-8');
+}
+
+function updateCodexStateHashes(state, entries) {
+  for (const entry of entries) {
+    const dayKey = entry.timestamp.split('T')[0];
+    if (!state.recentHashes[dayKey]) {
+      state.recentHashes[dayKey] = [];
+    }
+    state.recentHashes[dayKey].push(entry.interaction_hash);
+  }
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 30);
+  const cutoffKey = cutoff.toISOString().split('T')[0];
+
+  for (const dayKey of Object.keys(state.recentHashes)) {
+    if (dayKey < cutoffKey) {
+      delete state.recentHashes[dayKey];
+    }
+  }
+
+  state.lastSyncAt = new Date().toISOString();
+}
+
+export async function codexSyncCommand(options = {}) {
+  const config = await loadConfig();
+
+  if (!config) {
+    console.log(chalk.red('❌ 未找到配置'));
+    console.log(chalk.gray('请先运行 `claude-stats init` 进行配置'));
+    return;
+  }
+
+  if (!config.enabled) {
+    console.log(chalk.yellow('⚠️  数据跟踪当前已禁用'));
+    console.log(chalk.gray('运行 `claude-stats toggle` 启用后再同步'));
+    return;
+  }
+
+  const sessionsDir = options.sessionsDir || getCodexSessionsDir();
+  const statePath = path.join(path.dirname(CONFIG_PATH), 'codex-stats-state.json');
+  const state = await loadCodexState(statePath);
+
+  console.log(chalk.blue('🤖 Codex 使用数据同步'));
+  console.log(chalk.gray('─'.repeat(40)));
+  console.log(`${chalk.gray('Sessions:')} ${sessionsDir}`);
+
+  const entries = await collectCodexUsageData(state, { sessionsDir });
+
+  if (entries.length === 0) {
+    console.log(chalk.green('✓ 没有新的 Codex 使用记录需要同步'));
+    return;
+  }
+
+  const totalTokens = entries.reduce((sum, entry) => {
+    const tokens = entry.tokens || {};
+    return sum + (tokens.input || 0) + (tokens.output || 0) +
+      (tokens.cache_creation || 0) + (tokens.cache_read || 0);
+  }, 0);
+
+  console.log(`${chalk.gray('待同步记录:')} ${chalk.cyan(entries.length)}`);
+  console.log(`${chalk.gray('Token 总数:')} ${chalk.yellow(formatNumber(totalTokens))}`);
+
+  if (options.dryRun) {
+    console.log(chalk.yellow('Dry run: 未发送数据，也未更新同步状态'));
+    return;
+  }
+
+  const batchSize = Number(options.batchSize) || 100;
+  let inserted = 0;
+  let skipped = 0;
+
+  for (let index = 0; index < entries.length; index += batchSize) {
+    const batch = entries.slice(index, index + batchSize);
+    const batchNumber = Math.floor(index / batchSize) + 1;
+    const batchTotal = Math.ceil(entries.length / batchSize);
+    console.log(chalk.gray(`正在发送批次 ${batchNumber}/${batchTotal} (${batch.length} 条)...`));
+
+    const result = await sendUsageBatch(config, batch);
+    inserted += result.inserted || 0;
+    skipped += result.skipped || 0;
+  }
+
+  updateCodexStateHashes(state, entries);
+  await saveCodexState(statePath, state);
+
+  console.log(chalk.green('✓ Codex 使用数据同步完成'));
+  console.log(`${chalk.gray('新增:')} ${chalk.green(inserted)}`);
+  console.log(`${chalk.gray('跳过:')} ${chalk.yellow(skipped)}`);
 }
 
 // Hook 版本信息

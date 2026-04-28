@@ -44,10 +44,9 @@ This means Codex compatibility can use reported token counts rather than estimat
 
 ## Recommended MVP
 
-Add a Codex import/drain command instead of trying to install a Codex hook first:
+Add a Codex import/drain command instead of trying to install a Codex hook first. The initial implementation provides manual sync:
 
 ```bash
-claude-stats codex init
 claude-stats codex sync
 ```
 

@@ -88,6 +88,19 @@ claude-stats dashboard
 | `claude-stats upgrade-hook` | 通用 Hook 升级工具（推荐） |
 | `claude-stats cleanup` | 清理状态文件 |
 | `claude-stats debug` | 查看调试信息 |
+| `claude-stats codex sync` | 同步本机 Codex 使用数据 |
+
+### Codex 兼容同步（实验性）
+
+Codex 同步会读取本机 `~/.codex/sessions` 下的 rollout 元数据，只提取 `token_count` 事件中的 token 统计，不上传对话内容。
+
+```bash
+# 预览将同步的数据，不上传
+claude-stats codex sync --dry-run
+
+# 同步到已配置的服务器
+claude-stats codex sync
+```
 
 ### Web Dashboard 功能
 
