@@ -110,7 +110,7 @@ export async function disableCodexHooksFeature(configPath = getCodexConfigPath()
 }
 
 export function buildManagedCodexHookCommand(cliPath) {
-  return `node "${cliPath}" codex sync --batch-size 50 --quiet --max-records 100`;
+  return `node "${cliPath}" codex sync --batch-size 50 --quiet --hook-output-json --max-records 100`;
 }
 
 export function isManagedCodexHookCommand(command = '') {

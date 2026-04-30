@@ -116,6 +116,7 @@ codex
   .option('--batch-size <number>', 'Records to submit per request', '100')
   .option('--max-records <number>', 'Maximum records to submit in one run')
   .option('--quiet', 'Suppress progress output for hook usage')
+  .option('--hook-output-json', 'Emit valid Codex hook JSON on successful quiet runs')
   .option('--dry-run', 'Parse and summarize without submitting data')
   .action(codexSyncCommand);
 

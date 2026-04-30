@@ -5,6 +5,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+  chooseCodexModel,
   collectCodexUsageData,
   findCodexRolloutFiles,
   parseCodexUsageLine
@@ -22,7 +23,6 @@ try {
     type: 'session_meta',
     payload: {
       id: 'thread-1',
-      model: 'gpt-5.5',
       model_provider: 'openai'
     }
   };
@@ -73,7 +73,21 @@ try {
   assert.equal(parsedMeta.sessionMeta.id, 'thread-1');
   assert.equal(parsedMeta.usage, null);
 
-  const entries = await collectCodexUsageData({}, { sessionsDir });
+  assert.equal(chooseCodexModel({ model_provider: 'openai' }, { model: 'gpt-5.5' }), 'gpt-5.5');
+  assert.equal(chooseCodexModel({ model_provider: 'openai' }, {}), 'openai');
+
+  const entries = await collectCodexUsageData({}, {
+    sessionsDir,
+    threadMetadata: {
+      byId: {
+        'thread-1': {
+          model: 'gpt-5.5',
+          model_provider: 'openai'
+        }
+      },
+      byRolloutPath: {}
+    }
+  });
   assert.equal(entries.length, 1);
   assert.equal(entries[0].timestamp, tokenEvent.timestamp);
   assert.deepEqual(entries[0].tokens, {

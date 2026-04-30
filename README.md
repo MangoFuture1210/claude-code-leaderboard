@@ -97,6 +97,8 @@ claude-stats dashboard
 
 Codex 同步会读取本机 `~/.codex/sessions` 下的 rollout 元数据，只提取 `token_count` 事件中的 token 统计，不上传对话内容。
 
+Token 数量来自 Codex 自己生成的 rollout JSONL；模型名称会尽量从 Codex 本地状态库 `~/.codex/state_5.sqlite` 的 `threads.model` 补全，例如把 `openai` 细化为 `gpt-5.5`。如果该数据库不可用，同步仍会继续，只是模型名称可能退回到较粗的标签。
+
 ```bash
 # 预览将同步的数据，不上传
 claude-stats codex sync --dry-run
@@ -125,7 +127,7 @@ claude-stats codex hook uninstall --disable-feature
 
 自动同步命令会使用锁文件避免并发运行，并写入简洁日志到 `~/.claude/codex-sync.log`。日志只包含记录数量、成功/失败和耗时，不包含对话内容。
 
-安装 Hook 后，新的 Codex turn 会在后续 `Stop` 事件触发同步；已经打开的 Codex 会话如果没有立即触发，可以重启 Codex 或开启一个新会话让配置重新加载。同步是去重的，重复触发不会重复计入。
+安装 Hook 后，新的 Codex turn 会在后续 `Stop` 事件触发同步；Hook 命令会在成功时输出 Codex 要求的 JSON。已经打开的 Codex 会话如果没有立即触发，可以重启 Codex 或开启一个新会话让配置重新加载。同步是去重的，重复触发不会重复计入。多个 Codex Desktop/CLI 会话并发触发时，锁文件会确保只有一个同步进程实际运行，其余会安全退出并等待后续 Stop 事件补偿。
 
 ### Web Dashboard 功能
 

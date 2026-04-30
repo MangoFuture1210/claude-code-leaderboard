@@ -416,6 +416,12 @@ function getCodexSyncPaths() {
   };
 }
 
+function maybePrintCodexHookOutput(options) {
+  if (options.hookOutputJson) {
+    console.log('{}');
+  }
+}
+
 export function parsePositiveInteger(value, fallback = null) {
   if (value === undefined || value === null || value === '') return fallback;
 
@@ -501,6 +507,7 @@ export async function codexSyncCommand(options = {}) {
   const config = await loadConfig();
 
   if (!config) {
+    maybePrintCodexHookOutput(options);
     if (!options.quiet) {
       console.log(chalk.red('❌ 未找到配置'));
       console.log(chalk.gray('请先运行 `claude-stats init` 进行配置'));
@@ -509,6 +516,7 @@ export async function codexSyncCommand(options = {}) {
   }
 
   if (!config.enabled) {
+    maybePrintCodexHookOutput(options);
     if (!options.quiet) {
       console.log(chalk.yellow('⚠️  数据跟踪当前已禁用'));
       console.log(chalk.gray('运行 `claude-stats toggle` 启用后再同步'));
@@ -526,9 +534,10 @@ export async function codexSyncCommand(options = {}) {
       reason: 'lock-active'
     });
 
-    if (!options.quiet) {
-      console.log(chalk.yellow('⚠️  Codex sync is already running'));
-    }
+      if (!options.quiet) {
+        console.log(chalk.yellow('⚠️  Codex sync is already running'));
+      }
+      maybePrintCodexHookOutput(options);
     return;
   }
 
@@ -559,6 +568,7 @@ export async function codexSyncCommand(options = {}) {
       if (!options.quiet) {
         console.log(chalk.green('✓ 没有新的 Codex 使用记录需要同步'));
       }
+      maybePrintCodexHookOutput(options);
       return;
     }
 
@@ -577,6 +587,7 @@ export async function codexSyncCommand(options = {}) {
       if (!options.quiet) {
         console.log(chalk.yellow('Dry run: 未发送数据，也未更新同步状态'));
       }
+      maybePrintCodexHookOutput(options);
       return;
     }
 
@@ -606,7 +617,9 @@ export async function codexSyncCommand(options = {}) {
       durationMs: Date.now() - startedAt
     });
 
-    if (options.quiet) {
+    if (options.hookOutputJson) {
+      maybePrintCodexHookOutput(options);
+    } else if (options.quiet) {
       console.log(`Codex sync complete: inserted=${inserted} skipped=${skipped} records=${entries.length}`);
     } else {
       console.log(chalk.green('✓ Codex 使用数据同步完成'));

@@ -42,23 +42,28 @@ Observed local Codex state on this machine:
 
 This means Codex compatibility can use reported token counts rather than estimating tokens from text.
 
-## Recommended MVP
+## Implemented Codex Flow
 
-Add a Codex import/drain command instead of trying to install a Codex hook first. The initial implementation provides manual sync:
+The client now supports both manual sync and Codex Stop Hook auto-sync:
 
 ```bash
 claude-stats codex sync
+claude-stats codex hook install
+claude-stats codex hook status
+claude-stats codex hook uninstall
 ```
 
-The first version should:
+The Hook installer:
 
-1. Store shared tracking config in a neutral location such as `~/.ai-usage-stats/stats-config.json`, while continuing to read existing `~/.claude/stats-config.json` for backward compatibility.
-2. Read `~/.codex/state_5.sqlite` to discover threads, model, timestamps, and rollout paths.
-3. Read rollout JSONL files incrementally, extracting only `payload.type === "token_count"` events.
-4. Convert `last_token_usage` into one usage record per event.
-5. Send records to the existing `/api/usage/submit` endpoint.
+1. Enables `[features].codex_hooks = true` in `~/.codex/config.toml`.
+2. Writes a user-level `Stop` hook to `~/.codex/hooks.json`.
+3. Runs `codex sync --batch-size 50 --quiet --hook-output-json --max-records 100` after Codex agent turns.
+4. Returns `{}` on successful quiet hook runs because Codex Stop hooks require JSON stdout.
+5. Uses `~/.claude/codex-sync.lock` to avoid overlapping syncs across multiple Codex Desktop/CLI sessions.
 
-Auto-sync can now use Codex's official Stop Hook mechanism. The client should install a user-level hook in `~/.codex/hooks.json` and enable `[features].codex_hooks = true` in `~/.codex/config.toml`.
+Observed in Codex Desktop: after the hook was installed and the config was reloaded, a Stop hook run synced 100 records and wrote a success entry to `~/.claude/codex-sync.log`.
+
+## Data Ownership
 
 Suggested mapping:
 
@@ -78,6 +83,16 @@ Suggested mapping:
 ```
 
 Using `last_token_usage` avoids double-counting. `total_token_usage` is cumulative within the thread and is useful for validation/debugging, not insertion.
+
+Important distinction:
+
+- Codex itself generates `~/.codex/sessions/.../rollout-*.jsonl`.
+- The leaderboard integration only reads those JSONL files; it does not create them.
+- Token counts come from rollout JSONL `token_count` events.
+- Specific model labels are enriched from `~/.codex/state_5.sqlite` when available.
+- If `state_5.sqlite` is missing, unreadable, renamed, or schema-changed, sync still works but may fall back to less specific labels such as `openai` or `codex`.
+
+`state_5.sqlite` appears to be Codex's internal state DB. The `5` should be treated as an internal storage/schema generation, not a stable public API.
 
 ## Product Naming
 
@@ -103,8 +118,10 @@ Useful follow-up improvements:
 
 - Codex local storage is implementation detail. `state_5.sqlite` and rollout JSONL are available today, but a future Codex release may rename files or fields.
 - Rollout JSONL may contain sensitive conversation/tool content, so the collector must parse only token-count metadata and avoid logging raw lines.
-- `threads.tokens_used` appears useful for summaries, but event-level `last_token_usage` gives better incremental records.
+- `threads.tokens_used` appears useful for summaries, but event-level `last_token_usage` gives better incremental records. The collector uses `threads.model` only for model labeling.
 - Codex may emit multiple token-count events per user turn or model request. Deduplication should be based on event identity/hash, not only session id.
+- Existing already-open Codex sessions may need a restart/new session before they reload hook config.
+- Hook auto-sync is best-effort. Failures are logged locally and the next Stop event or manual sync retries unsynced records.
 
 ## Implementation Plan
 

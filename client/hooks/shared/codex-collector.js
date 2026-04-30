@@ -4,10 +4,13 @@ import { readFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { homedir } from 'node:os';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import crypto from 'node:crypto';
 
 const CODEX_HOME_ENV = 'CODEX_HOME';
 const CODEX_SESSIONS_DIR = 'sessions';
+const execFileAsync = promisify(execFile);
 
 function getCodexDir() {
   return process.env[CODEX_HOME_ENV] || path.join(homedir(), '.codex');
@@ -15,6 +18,10 @@ function getCodexDir() {
 
 function getCodexSessionsDir(codexDir = getCodexDir()) {
   return path.join(codexDir, CODEX_SESSIONS_DIR);
+}
+
+function getCodexStateDbPath(codexDir = getCodexDir()) {
+  return path.join(codexDir, 'state_5.sqlite');
 }
 
 async function findCodexRolloutFiles(dir = getCodexSessionsDir()) {
@@ -73,7 +80,62 @@ function buildInteractionHash(sessionId, timestamp, usage) {
   return crypto.createHash('sha256').update(hashInput).digest('hex');
 }
 
-function parseCodexUsageLine(line, sessionMeta = {}) {
+function chooseCodexModel(sessionMeta = {}, threadMetadata = {}) {
+  return threadMetadata.model ||
+    sessionMeta.model ||
+    sessionMeta.default_model ||
+    sessionMeta.active_model ||
+    sessionMeta.model_provider ||
+    'codex';
+}
+
+async function loadCodexThreadMetadata(codexDir = getCodexDir(), logger = null) {
+  const dbPath = getCodexStateDbPath(codexDir);
+  const byId = {};
+  const byRolloutPath = {};
+
+  if (!existsSync(dbPath)) {
+    return { byId, byRolloutPath };
+  }
+
+  try {
+    const { stdout } = await execFileAsync('sqlite3', [
+      '-json',
+      dbPath,
+      'SELECT id, rollout_path, model, model_provider, reasoning_effort FROM threads'
+    ], { timeout: 5000 });
+
+    const rows = stdout.trim() ? JSON.parse(stdout) : [];
+    for (const row of rows) {
+      const metadata = {
+        id: row.id,
+        rollout_path: row.rollout_path,
+        model: row.model || null,
+        model_provider: row.model_provider || null,
+        reasoning_effort: row.reasoning_effort || null
+      };
+
+      if (metadata.id) byId[metadata.id] = metadata;
+      if (metadata.rollout_path) byRolloutPath[metadata.rollout_path] = metadata;
+    }
+  } catch (error) {
+    if (logger) {
+      await logger.log('warn', 'Failed to load Codex thread metadata', {
+        error: error.message
+      });
+    }
+  }
+
+  return { byId, byRolloutPath };
+}
+
+function findThreadMetadata(filePath, sessionMeta = {}, threadMetadata = {}) {
+  return threadMetadata.byId?.[sessionMeta.id] ||
+    threadMetadata.byRolloutPath?.[filePath] ||
+    {};
+}
+
+function parseCodexUsageLine(line, sessionMeta = {}, threadMeta = {}) {
   try {
     const event = JSON.parse(line.trim());
     if (event?.type === 'session_meta') {
@@ -99,7 +161,7 @@ function parseCodexUsageLine(line, sessionMeta = {}) {
       usage: {
         timestamp,
         tokens,
-        model: sessionMeta.model || sessionMeta.model_provider || 'codex',
+        model: chooseCodexModel(sessionMeta, threadMeta),
         session_id: sessionId,
         interaction_hash: buildInteractionHash(sessionId, timestamp, lastUsage),
         source: 'codex'
@@ -110,7 +172,7 @@ function parseCodexUsageLine(line, sessionMeta = {}) {
   }
 }
 
-async function parseCodexRolloutFile(filePath, state = {}, logger = null, seenHashes = new Set()) {
+async function parseCodexRolloutFile(filePath, state = {}, logger = null, seenHashes = new Set(), threadMetadata = {}) {
   const entries = [];
   let sessionMeta = {};
 
@@ -119,7 +181,11 @@ async function parseCodexRolloutFile(filePath, state = {}, logger = null, seenHa
     const lines = content.split('\n').filter(line => line.trim().length > 0);
 
     for (const line of lines) {
-      const parsed = parseCodexUsageLine(line, sessionMeta);
+      const parsed = parseCodexUsageLine(
+        line,
+        sessionMeta,
+        findThreadMetadata(filePath, sessionMeta, threadMetadata)
+      );
 
       if (parsed.sessionMeta) {
         sessionMeta = { ...sessionMeta, ...parsed.sessionMeta };
@@ -160,7 +226,8 @@ async function parseCodexRolloutFile(filePath, state = {}, logger = null, seenHa
 }
 
 async function collectCodexUsageData(state = {}, options = {}, logger = null) {
-  const sessionsDir = options.sessionsDir || getCodexSessionsDir(options.codexDir);
+  const codexDir = options.codexDir || getCodexDir();
+  const sessionsDir = options.sessionsDir || getCodexSessionsDir(codexDir);
 
   if (!existsSync(sessionsDir)) {
     if (logger) await logger.log('warn', 'No Codex sessions directory found');
@@ -170,9 +237,11 @@ async function collectCodexUsageData(state = {}, options = {}, logger = null) {
   const files = await findCodexRolloutFiles(sessionsDir);
   const allEntries = [];
   const seenHashes = new Set();
+  const threadMetadata = options.threadMetadata ||
+    await loadCodexThreadMetadata(codexDir, logger);
 
   for (const file of files) {
-    const entries = await parseCodexRolloutFile(file, state, logger, seenHashes);
+    const entries = await parseCodexRolloutFile(file, state, logger, seenHashes, threadMetadata);
     allEntries.push(...entries);
   }
 
@@ -182,8 +251,11 @@ async function collectCodexUsageData(state = {}, options = {}, logger = null) {
 export {
   getCodexDir,
   getCodexSessionsDir,
+  getCodexStateDbPath,
   findCodexRolloutFiles,
   mapCodexTokenUsage,
+  chooseCodexModel,
+  loadCodexThreadMetadata,
   parseCodexUsageLine,
   parseCodexRolloutFile,
   collectCodexUsageData
