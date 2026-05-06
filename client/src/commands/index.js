@@ -422,6 +422,10 @@ function maybePrintCodexHookOutput(options) {
   }
 }
 
+export function isCodexHookOutputMode(options = {}) {
+  return Boolean(options.quiet && options.hookOutputJson);
+}
+
 export function parsePositiveInteger(value, fallback = null) {
   if (value === undefined || value === null || value === '') return fallback;
 
@@ -635,6 +639,10 @@ export async function codexSyncCommand(options = {}) {
       durationMs: Date.now() - startedAt,
       error: error.message
     });
+    if (isCodexHookOutputMode(options)) {
+      maybePrintCodexHookOutput(options);
+      return;
+    }
     throw error;
   } finally {
     await releaseLock();

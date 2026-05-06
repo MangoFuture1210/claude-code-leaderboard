@@ -7,6 +7,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   acquireCodexSyncLock,
+  isCodexHookOutputMode,
   limitCodexSyncEntries,
   parsePositiveInteger
 } from '../src/commands/index.js';
@@ -16,6 +17,8 @@ assert.equal(parsePositiveInteger('0', 100), 100);
 assert.equal(parsePositiveInteger('abc', 100), 100);
 assert.deepEqual(limitCodexSyncEntries([1, 2, 3], '2'), [1, 2]);
 assert.deepEqual(limitCodexSyncEntries([1, 2, 3], undefined), [1, 2, 3]);
+assert.equal(isCodexHookOutputMode({ quiet: true, hookOutputJson: true }), true);
+assert.equal(isCodexHookOutputMode({ quiet: false, hookOutputJson: true }), false);
 
 const tempDir = await mkdtemp(path.join(tmpdir(), 'codex-sync-lock-'));
 try {

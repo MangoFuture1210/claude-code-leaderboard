@@ -127,7 +127,7 @@ claude-stats codex hook uninstall --disable-feature
 
 自动同步命令会使用锁文件避免并发运行，并写入简洁日志到 `~/.claude/codex-sync.log`。日志只包含记录数量、成功/失败和耗时，不包含对话内容。
 
-安装 Hook 后，新的 Codex turn 会在后续 `Stop` 事件触发同步；Hook 命令会在成功时输出 Codex 要求的 JSON。已经打开的 Codex 会话如果没有立即触发，可以重启 Codex 或开启一个新会话让配置重新加载。同步是去重的，重复触发不会重复计入。多个 Codex Desktop/CLI 会话并发触发时，锁文件会确保只有一个同步进程实际运行，其余会安全退出并等待后续 Stop 事件补偿。
+安装 Hook 后，新的 Codex turn 会在后续 `Stop` 事件触发同步；Hook 命令会在成功时输出 Codex 要求的 JSON。Hook 自动同步是 best-effort：如果服务器请求超时或失败，会记录到本地日志并让后续 Stop 事件或手动同步重试，不会阻塞 Codex 会话。已经打开的 Codex 会话如果没有立即触发，可以重启 Codex 或开启一个新会话让配置重新加载。同步是去重的，重复触发不会重复计入。多个 Codex Desktop/CLI 会话并发触发时，锁文件会确保只有一个同步进程实际运行，其余会安全退出并等待后续 Stop 事件补偿。
 
 ### Web Dashboard 功能
 

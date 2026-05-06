@@ -53,7 +53,7 @@ const merged = mergeManagedCodexHookConfig({
 
 assert.equal(merged.hooks.Stop.length, 2);
 assert.equal(merged.hooks.Stop[0].hooks[0].command, 'echo unrelated');
-assert.match(merged.hooks.Stop[1].hooks[0].command, /codex sync --batch-size 50 --quiet --hook-output-json --max-records 100/);
+assert.match(merged.hooks.Stop[1].hooks[0].command, /codex sync --batch-size 20 --quiet --hook-output-json --max-records 20/);
 
 const replaced = mergeManagedCodexHookConfig(merged, buildManagedCodexStopHook('/tmp/other/client/bin/cli.js'));
 assert.equal(replaced.hooks.Stop.length, 2);

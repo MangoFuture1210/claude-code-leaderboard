@@ -57,11 +57,12 @@ The Hook installer:
 
 1. Enables `[features].codex_hooks = true` in `~/.codex/config.toml`.
 2. Writes a user-level `Stop` hook to `~/.codex/hooks.json`.
-3. Runs `codex sync --batch-size 50 --quiet --hook-output-json --max-records 100` after Codex agent turns.
+3. Runs `codex sync --batch-size 20 --quiet --hook-output-json --max-records 20` after Codex agent turns.
 4. Returns `{}` on successful quiet hook runs because Codex Stop hooks require JSON stdout.
 5. Uses `~/.claude/codex-sync.lock` to avoid overlapping syncs across multiple Codex Desktop/CLI sessions.
 
 Observed in Codex Desktop: after the hook was installed and the config was reloaded, a Stop hook run synced 100 records and wrote a success entry to `~/.claude/codex-sync.log`.
+Later hook runs showed that large hook batches can hit the client's 30-second request timeout when the server is slow or cold-starting. Hook mode is therefore best-effort: network submit errors are logged locally, the hook still exits successfully with `{}`, and later Stop events or a manual sync retry the unsynced records.
 
 ## Data Ownership
 
