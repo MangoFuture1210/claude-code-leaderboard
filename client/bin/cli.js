@@ -13,7 +13,11 @@ import {
   updateHookToV3Command,
   upgradeHookCommand,
   cleanupCommand,
-  debugCommand
+  debugCommand,
+  codexSyncCommand,
+  codexHookInstallCommand,
+  codexHookStatusCommand,
+  codexHookUninstallCommand
 } from '../src/commands/index.js';
 import { normalizeServerUrl } from '../src/utils/config.js';
 
@@ -100,6 +104,42 @@ program
   .option('-l, --logs', 'Show recent log entries')
   .action(debugCommand);
 
+// Codex 兼容命令
+const codex = program
+  .command('codex')
+  .description('Codex compatibility commands');
+
+codex
+  .command('sync')
+  .description('Sync Codex token usage from local rollout metadata')
+  .option('--sessions-dir <path>', 'Override Codex sessions directory')
+  .option('--batch-size <number>', 'Records to submit per request', '100')
+  .option('--max-records <number>', 'Maximum records to submit in one run')
+  .option('--quiet', 'Suppress progress output for hook usage')
+  .option('--hook-output-json', 'Emit valid Codex hook JSON on successful quiet runs')
+  .option('--dry-run', 'Parse and summarize without submitting data')
+  .action(codexSyncCommand);
+
+const codexHook = codex
+  .command('hook')
+  .description('Install or manage Codex Stop Hook auto-sync');
+
+codexHook
+  .command('install')
+  .description('Install Codex Stop Hook auto-sync')
+  .action(codexHookInstallCommand);
+
+codexHook
+  .command('status')
+  .description('Show Codex Stop Hook auto-sync status')
+  .action(codexHookStatusCommand);
+
+codexHook
+  .command('uninstall')
+  .description('Remove Codex Stop Hook auto-sync')
+  .option('--disable-feature', 'Also set codex_hooks = false in Codex config')
+  .action(codexHookUninstallCommand);
+
 // 默认命令 - 显示帮助或状态
 program
   .action(async () => {
@@ -132,8 +172,8 @@ async function main() {
       console.error(chalk.red('错误:'), error.message);
       process.exit(1);
     }
-    // 其他错误直接退出，不显示错误信息
-    process.exit(0);
+    console.error(chalk.red('错误:'), error.message);
+    process.exit(1);
   }
 }
 

@@ -88,6 +88,46 @@ claude-stats dashboard
 | `claude-stats upgrade-hook` | 通用 Hook 升级工具（推荐） |
 | `claude-stats cleanup` | 清理状态文件 |
 | `claude-stats debug` | 查看调试信息 |
+| `claude-stats codex sync` | 同步本机 Codex 使用数据 |
+| `claude-stats codex hook install` | 安装 Codex Stop Hook 自动同步 |
+| `claude-stats codex hook status` | 查看 Codex Stop Hook 状态 |
+| `claude-stats codex hook uninstall` | 移除 Codex Stop Hook 自动同步 |
+
+### Codex 兼容同步（实验性）
+
+Codex 同步会读取本机 `~/.codex/sessions` 下的 rollout 元数据，只提取 `token_count` 事件中的 token 统计，不上传对话内容。
+
+Token 数量来自 Codex 自己生成的 rollout JSONL；模型名称会尽量从 Codex 本地状态库 `~/.codex/state_5.sqlite` 的 `threads.model` 补全，例如把 `openai` 细化为 `gpt-5.5`。如果该数据库不可用，同步仍会继续，只是模型名称可能退回到较粗的标签。
+
+```bash
+# 预览将同步的数据，不上传
+claude-stats codex sync --dry-run
+
+# 同步到已配置的服务器
+claude-stats codex sync
+```
+
+### Codex Stop Hook 自动同步（实验性）
+
+Codex 支持官方 Hook 机制。安装后，客户端会启用 `codex_hooks`，并在 `~/.codex/hooks.json` 中注册 `Stop` Hook，在每次 Codex agent turn 结束后自动执行小批量同步。
+
+```bash
+# 安装自动同步 Hook
+claude-stats codex hook install
+
+# 查看 Hook 状态
+claude-stats codex hook status
+
+# 移除 Hook（默认保留 codex_hooks feature 开启状态）
+claude-stats codex hook uninstall
+
+# 如果你确定不再需要任何 Codex Hook，也可以同时关闭 feature
+claude-stats codex hook uninstall --disable-feature
+```
+
+自动同步命令会使用锁文件避免并发运行，并写入简洁日志到 `~/.claude/codex-sync.log`。日志只包含记录数量、成功/失败和耗时，不包含对话内容。
+
+安装 Hook 后，新的 Codex turn 会在后续 `Stop` 事件触发同步；Hook 命令会在成功时输出 Codex 要求的 JSON。Hook 自动同步是 best-effort：如果服务器请求超时或失败，会记录到本地日志并让后续 Stop 事件或手动同步重试，不会阻塞 Codex 会话。已经打开的 Codex 会话如果没有立即触发，可以重启 Codex 或开启一个新会话让配置重新加载。同步是去重的，重复触发不会重复计入。多个 Codex Desktop/CLI 会话并发触发时，锁文件会确保只有一个同步进程实际运行，其余会安全退出并等待后续 Stop 事件补偿。
 
 ### Web Dashboard 功能
 

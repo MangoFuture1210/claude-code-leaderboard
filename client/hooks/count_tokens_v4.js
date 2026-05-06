@@ -9,7 +9,7 @@
 // 5. 快速失败锁：1 秒锁超时（v3 为 5 秒）
 
 import { readFile, writeFile, rename, unlink, open, stat, appendFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { homedir } from 'node:os';
@@ -20,11 +20,15 @@ import { collectNewUsageDataIncremental } from './shared/data-collector.js';
 // 获取用户主目录和 Claude 配置目录
 const USER_HOME_DIR = homedir();
 
+// CLAUDE_CONFIG_DIR-aware: matches data-collector.js project discovery
+const CONFIG_DIR = process.env.CLAUDE_CONFIG_DIR
+  || path.join(USER_HOME_DIR, '.claude');
+
 // 文件路径
-const STATE_FILE = path.join(USER_HOME_DIR, '.claude', 'stats-state.json');
-const BUFFER_FILE = path.join(USER_HOME_DIR, '.claude', 'stats-state.buffer.json');
-const LOCK_FILE = path.join(USER_HOME_DIR, '.claude', 'stats.lock');
-const LOG_FILE = path.join(USER_HOME_DIR, '.claude', 'stats-debug.log');
+const STATE_FILE = path.join(CONFIG_DIR, 'stats-state.json');
+const BUFFER_FILE = path.join(CONFIG_DIR, 'stats-state.buffer.json');
+const LOCK_FILE = path.join(CONFIG_DIR, 'stats.lock');
+const LOG_FILE = path.join(CONFIG_DIR, 'stats-debug.log');
 
 // V4 配置常量
 const THROTTLE_INTERVAL = 30_000;       // 30 秒节流
@@ -217,7 +221,10 @@ function sendRequest(config, entries, timeout = REQUEST_TIMEOUT) {
     port: url.port || (isHttps ? 443 : 80),
     path: `${basePath}/api/usage/submit`,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': 'claude-stats-hook/4.0'
+    },
     timeout
   };
 
@@ -336,7 +343,7 @@ async function main() {
 
   try {
     // 读取配置
-    const configPath = path.join(USER_HOME_DIR, '.claude', 'stats-config.json');
+    const configPath = path.join(CONFIG_DIR, 'stats-config.json');
     if (!existsSync(configPath)) {
       return;
     }
@@ -427,8 +434,8 @@ async function main() {
   }
 }
 
-// 如果作为独立脚本运行
-if (import.meta.url === `file://${process.argv[1]}`) {
+// 如果作为独立脚本运行 (realpathSync resolves symlinks so hook works via ~/.claude-mm/ symlink)
+if (import.meta.url === `file://${realpathSync(process.argv[1])}`) {
   main().catch(() => {}).finally(() => process.exit(0));
 }
 

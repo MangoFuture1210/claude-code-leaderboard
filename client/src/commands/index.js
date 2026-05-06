@@ -3,10 +3,22 @@ import inquirer from 'inquirer';
 import open from 'open';
 import path from 'path';
 import { homedir } from 'os';
-import { readFile, writeFile, unlink, mkdir, stat } from 'fs/promises';
+import { fileURLToPath } from 'url';
+import { appendFile, open as openFile, readFile, writeFile, unlink, mkdir, stat } from 'fs/promises';
 import { existsSync } from 'fs';
 import { loadConfig, saveConfig, CONFIG_PATH, normalizeServerUrl } from '../utils/config.js';
 import { installHook, uninstallHook, getCurrentHookVersion, cleanupStateFiles } from '../utils/hook-manager.js';
+import { collectCodexUsageData, getCodexSessionsDir } from '../../hooks/shared/codex-collector.js';
+import {
+  getCodexDir,
+  getCodexHookStatus,
+  installCodexStopHook,
+  uninstallCodexStopHook
+} from '../utils/codex-hook-manager.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const CLIENT_CLI_PATH = path.resolve(__dirname, '..', '..', 'bin', 'cli.js');
+const CODEX_SYNC_LOCK_STALE_MS = 30 * 60 * 1000;
 
 // 初始化配置
 export async function initCommand() {
@@ -334,6 +346,378 @@ function formatDate(dateStr) {
   if (!dateStr) return '-';
   const date = new Date(dateStr);
   return date.toLocaleString('zh-CN');
+}
+
+async function sendUsageBatch(config, entries) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+
+  let response;
+  try {
+    response = await fetch(`${normalizeServerUrl(config.serverUrl)}/api/usage/submit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'claude-stats-codex-sync/1.0'
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        username: config.username,
+        usage: entries
+      })
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  return await response.json();
+}
+
+async function loadCodexState(statePath) {
+  try {
+    if (!existsSync(statePath)) {
+      return {
+        version: '1.0.0',
+        recentHashes: {},
+        lastSyncAt: null
+      };
+    }
+
+    const content = await readFile(statePath, 'utf-8');
+    const state = JSON.parse(content);
+    return {
+      version: '1.0.0',
+      recentHashes: state.recentHashes || {},
+      lastSyncAt: state.lastSyncAt || null
+    };
+  } catch {
+    return {
+      version: '1.0.0',
+      recentHashes: {},
+      lastSyncAt: null
+    };
+  }
+}
+
+async function saveCodexState(statePath, state) {
+  await writeFile(statePath, JSON.stringify(state, null, 2), 'utf-8');
+}
+
+function getCodexSyncPaths() {
+  const configDir = path.dirname(CONFIG_PATH);
+  return {
+    statePath: path.join(configDir, 'codex-stats-state.json'),
+    lockPath: path.join(configDir, 'codex-sync.lock'),
+    logPath: path.join(configDir, 'codex-sync.log')
+  };
+}
+
+function maybePrintCodexHookOutput(options) {
+  if (options.hookOutputJson) {
+    console.log('{}');
+  }
+}
+
+export function isCodexHookOutputMode(options = {}) {
+  return Boolean(options.quiet && options.hookOutputJson);
+}
+
+export function parsePositiveInteger(value, fallback = null) {
+  if (value === undefined || value === null || value === '') return fallback;
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+async function appendCodexSyncLog(logPath, entry) {
+  try {
+    await mkdir(path.dirname(logPath), { recursive: true });
+    await appendFile(logPath, JSON.stringify({
+      timestamp: new Date().toISOString(),
+      ...entry
+    }) + '\n', 'utf-8');
+  } catch {
+    // Logging should never prevent sync.
+  }
+}
+
+export function limitCodexSyncEntries(entries, maxRecords) {
+  const max = parsePositiveInteger(maxRecords);
+  return max ? entries.slice(0, max) : entries;
+}
+
+export async function acquireCodexSyncLock(lockPath) {
+  await mkdir(path.dirname(lockPath), { recursive: true });
+
+  if (existsSync(lockPath)) {
+    try {
+      const lockData = JSON.parse(await readFile(lockPath, 'utf-8'));
+      const age = Date.now() - new Date(lockData.timestamp).getTime();
+      if (!Number.isFinite(age) || age > CODEX_SYNC_LOCK_STALE_MS) {
+        await unlink(lockPath).catch(() => {});
+      } else {
+        return null;
+      }
+    } catch {
+      await unlink(lockPath).catch(() => {});
+    }
+  }
+
+  try {
+    const fd = await openFile(lockPath, 'wx');
+    await fd.writeFile(JSON.stringify({
+      pid: process.pid,
+      timestamp: new Date().toISOString()
+    }));
+    await fd.close();
+  } catch (error) {
+    if (error.code === 'EEXIST') return null;
+    throw error;
+  }
+
+  return async () => {
+    await unlink(lockPath).catch(() => {});
+  };
+}
+
+function updateCodexStateHashes(state, entries) {
+  for (const entry of entries) {
+    const dayKey = entry.timestamp.split('T')[0];
+    if (!state.recentHashes[dayKey]) {
+      state.recentHashes[dayKey] = [];
+    }
+    state.recentHashes[dayKey].push(entry.interaction_hash);
+  }
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 30);
+  const cutoffKey = cutoff.toISOString().split('T')[0];
+
+  for (const dayKey of Object.keys(state.recentHashes)) {
+    if (dayKey < cutoffKey) {
+      delete state.recentHashes[dayKey];
+    }
+  }
+
+  state.lastSyncAt = new Date().toISOString();
+}
+
+export async function codexSyncCommand(options = {}) {
+  const startedAt = Date.now();
+  const config = await loadConfig();
+
+  if (!config) {
+    maybePrintCodexHookOutput(options);
+    if (!options.quiet) {
+      console.log(chalk.red('❌ 未找到配置'));
+      console.log(chalk.gray('请先运行 `claude-stats init` 进行配置'));
+    }
+    return;
+  }
+
+  if (!config.enabled) {
+    maybePrintCodexHookOutput(options);
+    if (!options.quiet) {
+      console.log(chalk.yellow('⚠️  数据跟踪当前已禁用'));
+      console.log(chalk.gray('运行 `claude-stats toggle` 启用后再同步'));
+    }
+    return;
+  }
+
+  const sessionsDir = options.sessionsDir || getCodexSessionsDir();
+  const { statePath, lockPath, logPath } = getCodexSyncPaths();
+  const releaseLock = await acquireCodexSyncLock(lockPath);
+
+  if (!releaseLock) {
+    await appendCodexSyncLog(logPath, {
+      status: 'skipped',
+      reason: 'lock-active'
+    });
+
+      if (!options.quiet) {
+        console.log(chalk.yellow('⚠️  Codex sync is already running'));
+      }
+      maybePrintCodexHookOutput(options);
+    return;
+  }
+
+  const state = await loadCodexState(statePath);
+  let entries = [];
+  let inserted = 0;
+  let skipped = 0;
+
+  try {
+    if (!options.quiet) {
+      console.log(chalk.blue('🤖 Codex 使用数据同步'));
+      console.log(chalk.gray('─'.repeat(40)));
+      console.log(`${chalk.gray('Sessions:')} ${sessionsDir}`);
+    }
+
+    entries = await collectCodexUsageData(state, { sessionsDir });
+    entries = limitCodexSyncEntries(entries, options.maxRecords);
+
+    if (entries.length === 0) {
+      await appendCodexSyncLog(logPath, {
+        status: 'success',
+        records: 0,
+        inserted: 0,
+        skipped: 0,
+        durationMs: Date.now() - startedAt
+      });
+
+      if (!options.quiet) {
+        console.log(chalk.green('✓ 没有新的 Codex 使用记录需要同步'));
+      }
+      maybePrintCodexHookOutput(options);
+      return;
+    }
+
+    const totalTokens = entries.reduce((sum, entry) => {
+      const tokens = entry.tokens || {};
+      return sum + (tokens.input || 0) + (tokens.output || 0) +
+        (tokens.cache_creation || 0) + (tokens.cache_read || 0);
+    }, 0);
+
+    if (!options.quiet) {
+      console.log(`${chalk.gray('待同步记录:')} ${chalk.cyan(entries.length)}`);
+      console.log(`${chalk.gray('Token 总数:')} ${chalk.yellow(formatNumber(totalTokens))}`);
+    }
+
+    if (options.dryRun) {
+      if (!options.quiet) {
+        console.log(chalk.yellow('Dry run: 未发送数据，也未更新同步状态'));
+      }
+      maybePrintCodexHookOutput(options);
+      return;
+    }
+
+    const batchSize = parsePositiveInteger(options.batchSize, 100);
+
+    for (let index = 0; index < entries.length; index += batchSize) {
+      const batch = entries.slice(index, index + batchSize);
+      const batchNumber = Math.floor(index / batchSize) + 1;
+      const batchTotal = Math.ceil(entries.length / batchSize);
+      if (!options.quiet) {
+        console.log(chalk.gray(`正在发送批次 ${batchNumber}/${batchTotal} (${batch.length} 条)...`));
+      }
+
+      const result = await sendUsageBatch(config, batch);
+      inserted += result.inserted || 0;
+      skipped += result.skipped || 0;
+    }
+
+    updateCodexStateHashes(state, entries);
+    await saveCodexState(statePath, state);
+
+    await appendCodexSyncLog(logPath, {
+      status: 'success',
+      records: entries.length,
+      inserted,
+      skipped,
+      durationMs: Date.now() - startedAt
+    });
+
+    if (options.hookOutputJson) {
+      maybePrintCodexHookOutput(options);
+    } else if (options.quiet) {
+      console.log(`Codex sync complete: inserted=${inserted} skipped=${skipped} records=${entries.length}`);
+    } else {
+      console.log(chalk.green('✓ Codex 使用数据同步完成'));
+      console.log(`${chalk.gray('新增:')} ${chalk.green(inserted)}`);
+      console.log(`${chalk.gray('跳过:')} ${chalk.yellow(skipped)}`);
+    }
+  } catch (error) {
+    await appendCodexSyncLog(logPath, {
+      status: 'error',
+      records: entries.length,
+      inserted,
+      skipped,
+      durationMs: Date.now() - startedAt,
+      error: error.message
+    });
+    if (isCodexHookOutputMode(options)) {
+      maybePrintCodexHookOutput(options);
+      return;
+    }
+    throw error;
+  } finally {
+    await releaseLock();
+  }
+}
+
+export async function codexHookInstallCommand() {
+  const config = await loadConfig();
+
+  if (!config) {
+    console.log(chalk.red('❌ 未找到配置'));
+    console.log(chalk.gray('请先运行 `claude-stats init` 进行配置'));
+    return;
+  }
+
+  if (!config.enabled) {
+    console.log(chalk.yellow('⚠️  数据跟踪当前已禁用'));
+    console.log(chalk.gray('运行 `claude-stats toggle` 启用后再安装 Codex Hook'));
+    return;
+  }
+
+  const result = await installCodexStopHook({
+    cliPath: CLIENT_CLI_PATH,
+    codexDir: getCodexDir()
+  });
+  const { statePath, lockPath, logPath } = getCodexSyncPaths();
+
+  console.log(chalk.green('✓ Codex Stop Hook 已安装'));
+  console.log(`${chalk.gray('配置文件:')} ${result.configPath}`);
+  console.log(`${chalk.gray('Hook 文件:')} ${result.hooksPath}`);
+  console.log(`${chalk.gray('命令:')} ${result.command}`);
+  console.log(`${chalk.gray('状态文件:')} ${statePath}`);
+  console.log(`${chalk.gray('锁文件:')} ${lockPath}`);
+  console.log(`${chalk.gray('日志文件:')} ${logPath}`);
+}
+
+export async function codexHookStatusCommand() {
+  const status = await getCodexHookStatus({
+    cliPath: CLIENT_CLI_PATH,
+    codexDir: getCodexDir()
+  });
+  const { statePath, lockPath, logPath } = getCodexSyncPaths();
+
+  console.log(chalk.blue('🤖 Codex Hook 状态'));
+  console.log(chalk.gray('─'.repeat(40)));
+  console.log(`${chalk.gray('codex_hooks:')} ${status.featureEnabled ? chalk.green('enabled') : chalk.yellow('disabled')}`);
+  console.log(`${chalk.gray('Stop Hook:')} ${status.hookInstalled ? chalk.green('installed') : chalk.yellow('not installed')}`);
+  console.log(`${chalk.gray('配置文件:')} ${status.configPath}`);
+  console.log(`${chalk.gray('Hook 文件:')} ${status.hooksPath}`);
+  console.log(`${chalk.gray('命令:')} ${status.command || '-'}`);
+  console.log(`${chalk.gray('超时:')} ${status.timeout || '-'}`);
+  console.log(`${chalk.gray('状态消息:')} ${status.statusMessage || '-'}`);
+  console.log(`${chalk.gray('状态文件:')} ${statePath}`);
+  console.log(`${chalk.gray('锁文件:')} ${lockPath}`);
+  console.log(`${chalk.gray('日志文件:')} ${logPath}`);
+}
+
+export async function codexHookUninstallCommand(options = {}) {
+  const result = await uninstallCodexStopHook({
+    codexDir: getCodexDir(),
+    disableFeature: Boolean(options.disableFeature)
+  });
+
+  if (result.removed) {
+    console.log(chalk.green('✓ Codex Stop Hook 已移除'));
+  } else {
+    console.log(chalk.yellow('⚠️  未找到已安装的 Codex Stop Hook'));
+  }
+
+  if (result.featureDisabled) {
+    console.log(chalk.green('✓ codex_hooks feature 已禁用'));
+  }
+
+  console.log(`${chalk.gray('配置文件:')} ${result.configPath}`);
+  console.log(`${chalk.gray('Hook 文件:')} ${result.hooksPath}`);
 }
 
 // Hook 版本信息
